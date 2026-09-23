@@ -6,10 +6,14 @@ organized into labeled groups with large/small icon buttons.
 """
 
 import re
+from pathlib import Path
 
 from qgis.PyQt import sip
 from qgis.PyQt.QtCore import QSize, Qt
+from qgis.PyQt.QtGui import QIcon, QPixmap
 from qgis.PyQt.QtWidgets import (
+    QAction,
+    QDockWidget,
     QFrame,
     QGridLayout,
     QHBoxLayout,
@@ -49,19 +53,389 @@ MENU_TOOLBAR_MAP = {
 # Tab ordering — controls the order tabs appear in the ribbon
 TAB_ORDER = [
     "mProjectMenu",
-    "mEditMenu",
-    "mSelectionMenu",  # Special virtual menu for Selection actions
     "mViewMenu",
-    "mLayerMenu",
-    "mSettingsMenu",
     "mRasterMenu",
     "mVectorMenu",
-    "processing",
     "mMeshMenu",
-    "mDatabaseMenu",
-    "mWebMenu",
+]
+
+# Menu tabs placed after TOOLBAR_TABS and the Styling tab
+TRAILING_TAB_ORDER = [
     "mPluginMenu",
-    "mHelpMenu",
+]
+
+# Hand-arranged groups for tabs listed in ARRANGED_TABS, LibreOffice style:
+# (title, large buttons, small buttons). Entries are QAction or QMenu
+# objectNames, or "menuName>Submenu Title" for submenus without an
+# objectName; a menu entry becomes a popup button, "name/*" expands a
+# menu into its individual actions (those not placed yet), and a
+# ("Label", [entries]) tuple becomes a popup button with those entries,
+# and "dock:objectName" is the show/hide action of that panel.
+# Missing names are skipped, and actions
+# from the tab's menu / toolbars not listed here end up in a "More" group.
+# An optional 4th element holds layout options for the small buttons:
+# {"rows": number of rows (default 3), "icon_size": icon size in px,
+#  "labels": False to show small buttons compactly (icon only if they
+#  have an icon, otherwise text only)}.
+PROJECT_TAB_GROUPS = [
+    ("New", ["mActionNewProject"], ["mProjectFromTemplateMenu", "mActionCloseProject"]),
+    ("Open", ["mActionOpenProject"], []),
+    (
+        "Save",
+        ["mActionSaveProject"],
+        ["mActionSaveProjectAs", "mProjectToStorageMenu", "mActionRevertProject"],
+    ),
+    (
+        "Project Settings",
+        ["mActionProjectProperties"],
+        ["mActionSnappingOptions", "mActionStyleManager", "mProjectMenu>Models"],
+    ),
+    (
+        "Layouts",
+        ["mActionNewPrintLayout"],
+        ["mActionNewReport", "mActionShowLayoutManager"],
+    ),
+    (
+        "Import/Export",
+        [],
+        [
+            ("Export Map to…", ["mActionSaveMapAsImage", "mActionSaveMapAsPdf"]),
+            ("DWG/DXF", ["mActionDxfExport", "mActionDwgImport"]),
+            "menuImport_Export/*",
+        ],
+    ),
+]
+
+# Shared by the Home and Vector tabs
+SELECTION_GROUP = (
+    "Selection",
+    ["mActionSelectFeatures"],
+    [
+        "mActionSelectPolygon",
+        "mActionSelectFreehand",
+        "mActionSelectRadius",
+        "mActionSelectByForm",
+        "mActionSelectByExpression",
+        "mActionSelectAll",
+        "mActionInvertSelection",
+        "mActionReselect",
+        "mActionDeselectAll",
+        "mActionDeselectActiveLayer",
+    ],
+    {"rows": 2, "icon_size": 24},
+)
+
+HOME_TAB_GROUPS = [
+    ("Layer", ["mActionDataSourceManager"], ["mLayerMenu/*"], {"labels": False}),
+    (
+        "Identify",
+        ["mActionIdentify"],
+        ["mActionMapTips", "ActionFeatureAction", "mViewMenu>Measure"],
+    ),
+    (
+        "Pan",
+        ["mActionPan"],
+        ["mActionPanToSelected", "mActionNewBookmark", "mActionShowBookmarkManager"],
+    ),
+    (
+        "Zoom",
+        ["mActionZoomIn", "mActionZoomOut"],
+        [
+            "mActionZoomFullExtent",
+            "mActionZoomToSelected",
+            "mActionZoomToLayers",
+            "mActionZoomLast",
+            "mActionZoomNext",
+            "mActionZoomActualSize",
+        ],
+        {"rows": 2, "icon_size": 24},
+    ),
+    SELECTION_GROUP,
+    (
+        "Attributes",
+        ["ActionOpenTable"],
+        ["mActionOpenFieldCalc", "mActionStatisticalSummary", "mMenuFilterTable"],
+    ),
+]
+
+VIEW_TAB_GROUPS = [
+    ("Map Views", ["mActionNewMapCanvas"], ["mViewMenu>3D Map Views", "mActionDraw"]),
+    (
+        "Display",
+        [],
+        [
+            "mActionTemporalController",
+            "mActionElevationController",
+            "mViewMenu>Elevation Profiles",
+            "mViewMenu>Decorations",
+            "mViewMenu>Preview Mode",
+        ],
+    ),
+    (
+        "Overview",
+        ["dock:Overview"],
+        [
+            "mActionAddToOverview",
+            "mActionAddAllToOverview",
+            "mActionRemoveAllFromOverview",
+        ],
+    ),
+    ("Processing", ["toolboxAction"], []),
+]
+
+# Actions left out of the Home and View tabs (ActionMeasure duplicates
+# the Measure submenu)
+VIEW_MENU_EXCLUDED = [
+    "mViewMenu>Panels",
+    "mViewMenu>Toolbars",
+    "mViewMenu>Layer Visibility",
+    # Its actions are shown individually in the View tab's Display group
+    "mViewMenu>Data Filtering",
+    "mActionToggleFullScreen",
+    "mActionTogglePanelsVisibility",
+    "mActionToggleMapOnly",
+    "mActionShowBookmarks",
+    "ActionMeasure",
+    # Layer menu actions left out of the Home tab's Layer group
+    # (mActionOpenTable duplicates the Attribute Table button)
+    "mActionOpenTable",
+    "mActionLayerSaveAs",
+    "mActionSaveLayerDefinition",
+    "mActionLayerProperties",
+    "mActionSetLayerScaleVisibility",
+    "mActionSetLayerCRS",
+    "mActionSetProjectCRSFromLayer",
+    "mActionLabeling",
+    "mActionRemoveLayer",
+    "mActionLayerSubsetString",
+    "mActionDuplicateLayer",
+    "mActionCopyLayer",
+    "mActionPasteLayer",
+    # On the Vector tab instead
+    "mNewLayerMenu",
+    # In the Add Layer button's dropdown
+    "mActionEmbedLayers",
+    "mActionAddLayerDefinition",
+    # Shown on the Raster / Edit tab / Layers panel toolbar instead
+    "mActionShowGeoreferencer",
+    "mActionToggleEditing",
+    "mActionSaveLayerEdits",
+    "mActionAllEdits",
+    "mActionCopyStyle",
+    "mActionPasteStyle",
+    "mAddLayerMenu",
+]
+
+# Shorter button labels for arranged tabs (tooltips keep the full text)
+SHORT_LABELS = {
+    "mProjectFromTemplateMenu": "From Template",
+    "mActionDataSourceManager": "Add Layer",
+    "dock:Overview": "Show Overview",
+    "mActionIdentify": "Identify",
+    "mActionToggleEditing": "Toggle Editing",
+    "EnableSnappingAction": "Enable Snapping",
+    "ActionVertexTool": "Vertex Tool",
+    "mActionAddFeature": "Add Feature",
+    "mActionManagePlugins": "Plugin Manager",
+    "mActionPan": "Pan",
+    "mActionPanToSelected": "Pan to Selection",
+    "mActionNewBookmark": "New Bookmark",
+    "mActionShowBookmarkManager": "Bookmark Manager",
+    "ActionOpenTable": "Attribute Table",
+    "mActionOpenFieldCalc": "Field Calculator",
+    "mActionStatisticalSummary": "Statistics",
+}
+
+# Icons for arranged-tab buttons whose action has none: a file in the
+# plugin folder, or a Qt resource path (":/...")
+ICON_OVERRIDES = {
+    # QGIS ships this icon but does not set it on the action
+    "mActionShowMeshCalculator": ":/images/themes/default/mActionShowMeshCalculator.svg",
+    "mActionReselect": "reselect.svg",
+    "dock:Overview": "overview.svg",
+    # The icon of QGIS' own Layer Styling button
+    "dock:LayerStyling": ":/images/themes/default/propertyicons/symbology.svg",
+}
+
+# Buttons on arranged tabs shown without a label (tooltips keep the text)
+ICON_ONLY = {
+    "mActionZoomIn",
+    "mActionZoomOut",
+    "mActionZoomFullExtent",
+    "mActionZoomToSelected",
+    "mActionZoomToLayers",
+    "mActionZoomLast",
+    "mActionZoomNext",
+    "mActionZoomActualSize",
+    "mActionSelectPolygon",
+    "mActionSelectFreehand",
+    "mActionSelectRadius",
+    "mActionSelectByForm",
+    "mActionSelectByExpression",
+    "mActionSelectAll",
+    "mActionInvertSelection",
+    "mActionReselect",
+    "mActionDeselectAll",
+    "mActionDeselectActiveLayer",
+}
+
+# menu objectName -> (excluded entries, [(tab title, groups), ...]).
+# A menu can be split over several tabs; a tab title of None uses the menu
+# title, and unarranged actions go into a "More" group on the first tab.
+ARRANGED_TABS = {
+    "mProjectMenu": (
+        # mRecentProjectsMenu is the Open button's dropdown
+        [
+            "mActionExit",
+            "mProjectFromStorageMenu",
+            "mRecentProjectsMenu",
+            "mLayoutsMenu",
+        ],
+        [(None, PROJECT_TAB_GROUPS)],
+    ),
+    "mViewMenu": (
+        VIEW_MENU_EXCLUDED,
+        [("Home", HOME_TAB_GROUPS), ("View", VIEW_TAB_GROUPS)],
+    ),
+}
+
+# Extra hand-arranged groups (see PROJECT_TAB_GROUPS) placed at the start
+# of standard (not arranged) tabs, e.g. for actions from other menus
+EXTRA_TAB_GROUPS = {
+    "mRasterMenu": [
+        ("Georeferencer", ["mActionShowGeoreferencer"], []),
+        ("Raster Calculator", ["mActionShowRasterCalculator"], []),
+    ],
+    "mMeshMenu": [("Mesh Calculator", ["mActionShowMeshCalculator"], [])],
+    "mPluginMenu": [("Manage Plugins", ["mActionManagePlugins"], [])],
+    # The Edit menu's groups come first on the Vector tab (MERGED_TABS)
+    "mEditMenu": [
+        (
+            "Layer",
+            [],
+            ["mNewLayerMenu", "mActionToggleEditing", "EnableSnappingAction"],
+        )
+    ],
+}
+
+# Standard tabs that also show the groups of other menus (which then get
+# no tab of their own), placed before the tab's own groups
+MERGED_TABS = {
+    "mVectorMenu": ["mEditMenu"],
+}
+
+# Tab shown when the ribbon is created
+DEFAULT_TAB = "mViewMenu"
+
+# Toolbar groups on standard tabs laid out as a split group of small
+# buttons, with its options (see PROJECT_TAB_GROUPS); "large" lists the
+# objectNames of actions shown as large buttons instead, "only" limits the
+# group to the listed objectNames, "exclude" leaves the listed ones out
+TOOLBAR_GROUP_OPTIONS = {
+    # Two rows keep the local/full and increase/decrease pairs together
+    "mRasterToolBar": {"rows": 2, "icon_size": 24, "labels": False},
+    "mMeshToolBar": {"rows": 2, "icon_size": 24},
+    "mGpsToolBar": {"rows": 2, "icon_size": 24, "large": ["mConnectAction"]},
+    "mPluginToolBar": {"rows": 2, "icon_size": 24},
+    "mSnappingToolBar": {
+        "only": ["EnableSnappingAction"],
+        "large": ["EnableSnappingAction"],
+    },
+    "mLabelToolBar": {"rows": 2, "icon_size": 24, "labels": False},
+    "mAnnotationsToolBar": {"rows": 2, "icon_size": 24, "labels": False},
+    "mAdvancedDigitizeToolBar": {"rows": 2, "icon_size": 24, "labels": False},
+    "mShapeDigitizeToolBar": {"rows": 2, "icon_size": 24, "labels": False},
+    "mDigitizeToolBar": {
+        "rows": 2,
+        "icon_size": 24,
+        "labels": False,
+        "large": ["mActionAddFeature", "ActionVertexTool"],
+        # Shown in the Vector tab's first group instead
+        "exclude": ["mActionToggleEditing"],
+    },
+}
+
+# Actions whose small buttons on standard tabs show their label beside the
+# icon (instead of the icon only)
+LABELED_ACTIONS = {
+    "mProcessingUserMenu_native:alignrasters",
+    "mActionReindexMesh",
+}
+
+# Buttons that get a dropdown (click runs the action, the arrow shows the
+# listed (action objectName, label) entries, or the QMenu with the given
+# objectName)
+BUTTON_MENUS = {
+    "mActionOpenProject": "mRecentProjectsMenu",
+    "mActionPasteFeatures": [
+        ("mActionPasteAsNewVector", "Paste as New Vector Layer…"),
+        ("mActionPasteAsNewMemoryVector", "Paste as New Scratch Layer…"),
+    ],
+    "EnableSnappingAction": [("mActionSnappingOptions", "Snapping Options…")],
+    "mActionDataSourceManager": [
+        ("mActionEmbedLayers", "Embed Layers and Groups…"),
+        ("mActionAddLayerDefinition", "Add from Layer Definition File…"),
+    ],
+}
+
+# Entries (as in PROJECT_TAB_GROUPS) left out of standard tabs' menu groups
+STANDARD_TAB_EXCLUDED = {
+    "mEditMenu": [
+        # Its actions are in the Paste Features button's dropdown
+        "mEditMenu>Paste Features As",
+        "mEditMenu>Edit Attributes",
+        "mEditMenu>Edit Geometry",
+        # Shown on the Styling tab instead
+        "mEditMenu>Add Annotation",
+        "mActionRotatePointSymbols",
+        "mActionOffsetPointSymbol",
+    ],
+}
+
+# Extra entries (as in PROJECT_TAB_GROUPS) appended to Styling tab toolbar
+# groups
+STYLING_TAB_EXTRA_ENTRIES = {
+    "mAnnotationsToolBar": ["mEditMenu>Add Annotation"],
+}
+
+# Split group options for the toolbars of third-party plugins (shown on the
+# Plugins tab)
+PLUGIN_TOOLBAR_OPTIONS = {"rows": 2, "icon_size": 24}
+
+# Menu groups ("<Menu> Menu") on standard tabs replaced by these
+# hand-arranged groups (see PROJECT_TAB_GROUPS)
+MENU_GROUP_REPLACEMENTS = {
+    "mEditMenu": [SELECTION_GROUP],
+    "mVectorMenu": [("Processing", ["toolboxAction"], [])],
+    # No menu group; plugin menus are in the hamburger menu
+    "mPluginMenu": [],
+}
+
+# Menu groups ("<Menu> Menu") on standard tabs laid out as a split group of
+# small buttons, with its options (as in TOOLBAR_GROUP_OPTIONS)
+MENU_GROUP_OPTIONS = {}
+
+# Tabs (before the Styling tab) showing one group per toolbar, laid out as
+# in TOOLBAR_GROUP_OPTIONS: (tab title, [toolbar objectNames])
+TOOLBAR_TABS = [
+    ("GPS", ["mGpsToolBar"]),
+]
+
+# Hand-arranged groups (see PROJECT_TAB_GROUPS) added before the toolbar
+# groups on the Styling tab
+STYLING_TAB_LEADING_GROUPS = [
+    ("Layer Styling", ["dock:LayerStyling"], []),
+]
+
+# Hand-arranged groups (see PROJECT_TAB_GROUPS) added after the toolbar
+# groups on the Styling tab
+STYLING_TAB_GROUPS = [
+    (
+        "Point Symbols",
+        [],
+        ["mActionRotatePointSymbols", "mActionOffsetPointSymbol"],
+        {"rows": 2, "icon_size": 24},
+    ),
 ]
 
 # Toolbar groups that count as "primary" (get large icons)
@@ -76,7 +450,6 @@ LARGE_ICONS = {
     "processing",
     "mPluginMenu",
     "mPluginToolBar",
-    "mSelectionMenu",
 }
 
 MENU_POPUP_ACTIONS = {
@@ -122,6 +495,7 @@ MENU_POPUP_ACTIONS = {
 }
 
 TOOLBAR_POPUP_ACTIONS = {
+    ("mAnnotationsToolBar", "Add Annotation"),
     ("mDigitizeToolBar", "mActionAllEdits"),
     ("mSnappingToolBar", "EnableTracingAction"),
 }
@@ -164,7 +538,6 @@ QTabBar::tab {
     border-bottom: none;
     padding: 5px 14px;
     margin-right: 1px;
-    font-size: 11px;
     font-weight: 500;
     min-width: 50px;
     color: palette(button-text);
@@ -201,6 +574,8 @@ class RibbonWidget(QTabWidget):
     def __init__(self, iface, parent=None):
         super().__init__(parent)
         self.iface = iface
+        # action key -> entry name for actions without an objectName
+        self._entry_names = {}
         self.main_window = iface.mainWindow()
         self.setStyleSheet(RIBBON_STYLESHEET)
         self.setMinimumHeight(95)
@@ -217,16 +592,21 @@ class RibbonWidget(QTabWidget):
 
         # Build tabs in order
         for menu_name in TAB_ORDER:
-            if menu_name == "mSelectionMenu":
-                self._build_selection_menu_tab(menus_by_name)
-                continue
-
             self._build_standard_menu_tab(menu_name, menus_by_name, all_toolbars)
 
-        # "Extra" tab for additional toolbars (Snapping, Labels, Selection, etc.)
+        for title, toolbar_names in TOOLBAR_TABS:
+            tab = self._build_toolbar_tab(toolbar_names, all_toolbars)
+            if tab:
+                self.addTab(tab, title)
+
+        # "Extra" tab for layer styling and additional toolbars (Labels,
+        # Annotations, etc.)
         extra_tab = self._build_extra_tab(all_toolbars)
         if extra_tab:
-            self.addTab(extra_tab, "Tools")
+            self.addTab(extra_tab, "Styling")
+
+        for menu_name in TRAILING_TAB_ORDER:
+            self._build_standard_menu_tab(menu_name, menus_by_name, all_toolbars)
 
     def _collect_all_toolbars(self):
         """Collect all toolbars from the main window."""
@@ -275,36 +655,30 @@ class RibbonWidget(QTabWidget):
                 plugin_toolbars.append(tb)
         return plugin_toolbars
 
-    def _build_selection_menu_tab(self, menus_by_name):
-        """Build the virtual Selection menu tab."""
-        edit_menu = menus_by_name.get("mEditMenu")
-        if not edit_menu:
-            return
-
-        for action in edit_menu.actions():
-            submenu = action.menu()
-            if (
-                action.isSeparator()
-                or self._clean_text(action.text()) != "Select"
-                or not submenu
-            ):
-                continue
-            tab = self._build_selection_tab(submenu)
-            self.addTab(tab, "Selection")
-            return
-
     def _build_standard_menu_tab(self, menu_name, menus_by_name, all_toolbars):
         """Build a standard menu tab."""
         menu = menus_by_name.get(menu_name)
         if menu is None:
             return
 
-        tab = self._build_tab(menu, all_toolbars, menu_name)
         clean_title = menu.title().replace("&", "")
-        self.addTab(tab, clean_title)
+        if menu_name in ARRANGED_TABS:
+            tabs = self._build_arranged_tabs(menu, menu_name, all_toolbars)
+        else:
+            menus = [
+                (name, menus_by_name[name])
+                for name in MERGED_TABS.get(menu_name, [])
+                if name in menus_by_name
+            ] + [(menu_name, menu)]
+            tabs = [(None, self._build_tab(menus, all_toolbars))]
+        for i, (title, tab) in enumerate(tabs):
+            self.addTab(tab, title or clean_title)
+            if menu_name == DEFAULT_TAB and i == 0:
+                self.setCurrentWidget(tab)
 
-    def _build_tab(self, menu, all_toolbars, menu_name):
-        """Build a single ribbon tab for a QGIS menu."""
+    def _build_tab(self, menus, all_toolbars):
+        """Build a single ribbon tab for one or more QGIS menus, given as
+        (menu objectName, menu) pairs."""
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
@@ -319,6 +693,45 @@ class RibbonWidget(QTabWidget):
         # Track action identities and toolbar-only actions
         seen_ids = set()
         empty_toolbar_action_ids = set()
+
+        for menu_name, menu in menus:
+            self._add_standard_groups(
+                layout,
+                menu,
+                menu_name,
+                all_toolbars,
+                seen_ids,
+                empty_toolbar_action_ids,
+            )
+
+        layout.addStretch()
+        scroll.setWidget(container)
+        return scroll
+
+    def _add_standard_groups(
+        self,
+        layout,
+        menu,
+        menu_name,
+        all_toolbars,
+        seen_ids,
+        empty_toolbar_action_ids,
+    ):
+        """Add the groups of a standard (not arranged) menu tab to layout."""
+        self._resolve_actions(STANDARD_TAB_EXCLUDED.get(menu_name, []), seen_ids)
+
+        for title, large_names, small_names, *options in EXTRA_TAB_GROUPS.get(
+            menu_name, []
+        ):
+            # Mark them as seen so the menu group does not repeat them
+            large_actions = self._resolve_actions(large_names, seen_ids)
+            small_actions = self._resolve_actions(small_names, seen_ids)
+            if large_actions or small_actions:
+                layout.addWidget(
+                    self._create_split_group(
+                        title, large_actions, small_actions, *options
+                    )
+                )
 
         # Add toolbar-based groups first
         self._add_toolbar_groups(
@@ -338,9 +751,254 @@ class RibbonWidget(QTabWidget):
             layout, menu, menu_name, seen_ids, empty_toolbar_action_ids
         )
 
-        layout.addStretch()
-        scroll.setWidget(container)
-        return scroll
+    def _build_arranged_tabs(self, menu, menu_name, all_toolbars):
+        """Build the tab(s) for a menu from its hand-arranged groups in
+        ARRANGED_TABS. Returns a list of (title, tab widget)."""
+        excluded, tab_specs = ARRANGED_TABS[menu_name]
+        placed_ids = set()
+        self._resolve_actions(excluded, placed_ids)
+
+        # Resolve groups with "name/*" expansions last, so actions named
+        # explicitly anywhere (even on a later tab) are not claimed by them
+        def has_expansion(group):
+            return any(
+                isinstance(n, str) and n.endswith("/*")
+                for n in group[1] + group[2]
+            )
+
+        all_groups = [g for _, groups in tab_specs for g in groups]
+        resolved = {}
+        for group in sorted(all_groups, key=has_expansion):
+            resolved[id(group)] = (
+                self._resolve_actions(group[1], placed_ids),
+                self._resolve_actions(group[2], placed_ids),
+            )
+
+        tabs = []
+        layouts = []
+        for tab_title, groups in tab_specs:
+            scroll = QScrollArea()
+            scroll.setWidgetResizable(True)
+            scroll.setFrameShape(QFrame.Shape.NoFrame)
+            scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+            scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
+            container = QWidget()
+            layout = QHBoxLayout(container)
+            layout.setContentsMargins(4, 2, 4, 2)
+            layout.setSpacing(2)
+            scroll.setWidget(container)
+
+            for group in groups:
+                title, _, _, *options = group
+                large_actions, small_actions = resolved[id(group)]
+                if large_actions or small_actions:
+                    layout.addWidget(
+                        self._create_split_group(
+                            title, large_actions, small_actions, *options
+                        )
+                    )
+            tabs.append((tab_title, scroll))
+            layouts.append(layout)
+
+        # Keep anything not arranged above (e.g. added by plugins) reachable
+        sources = list(menu.actions())
+        for tb_name in MENU_TOOLBAR_MAP.get(menu_name, []):
+            tb = all_toolbars.get(tb_name)
+            if tb:
+                sources += tb.actions()
+        leftovers = []
+        for action in sources:
+            if action.isSeparator() or self._action_key(action) in placed_ids:
+                continue
+            placed_ids.add(self._action_key(action))
+            leftovers.append(action)
+        if leftovers:
+            layouts[0].addWidget(self._create_split_group("More", [], leftovers))
+
+        for layout in layouts:
+            layout.addStretch()
+        return tabs
+
+    def _resolve_actions(self, names, placed_ids):
+        """Look up actions by name (see PROJECT_TAB_GROUPS) and mark them,
+        and the contents of their submenus, as placed."""
+        actions = []
+
+        def add(action):
+            actions.append(action)
+            placed_ids.add(self._action_key(action))
+            if action.menu() is not None:
+                placed_ids.update(
+                    self._action_key(a) for a in action.menu().actions()
+                )
+
+        for name in names:
+            if isinstance(name, tuple):
+                label, entries = name
+                entry_actions = self._resolve_actions(entries, placed_ids)
+                if entry_actions:
+                    # Parented to the ribbon so it lives as long as the button
+                    menu = QMenu(label, self)
+                    icons = [a.icon() for a in entry_actions if not a.icon().isNull()]
+                    if icons:
+                        menu.setIcon(icons[0])
+                    menu.addActions(entry_actions)
+                    add(menu.menuAction())
+                continue
+            if name.startswith("dock:"):
+                dock = self.main_window.findChild(QDockWidget, name[len("dock:") :])
+                if dock is not None:
+                    action = dock.toggleViewAction()
+                    # Toggle actions have no objectName; remember the entry
+                    # name for SHORT_LABELS / ICON_ONLY / ICON_OVERRIDES
+                    self._entry_names[self._action_key(action)] = name
+                    add(action)
+                continue
+            expand = name.endswith("/*")
+            name = name.removesuffix("/*")
+            if ">" in name:
+                parent_name, title = name.split(">", 1)
+                menu = self._find_submenu(parent_name, title)
+            else:
+                menu = self.main_window.findChild(QMenu, name)
+            if menu is not None:
+                placed_ids.add(self._action_key(menu.menuAction()))
+                if expand:
+                    for a in menu.actions():
+                        if not a.isSeparator() and (
+                            self._action_key(a) not in placed_ids
+                        ):
+                            add(a)
+                else:
+                    add(menu.menuAction())
+                continue
+            action = self.main_window.findChild(QAction, name)
+            if action is not None:
+                add(action)
+        return actions
+
+    def _find_submenu(self, parent_name, title):
+        """Find a submenu of a named menu by its (cleaned) title."""
+        parent = self.main_window.findChild(QMenu, parent_name)
+        if parent is None:
+            return None
+        for action in parent.actions():
+            if action.menu() and self._clean_text(action.text()) == title:
+                return action.menu()
+        return None
+
+    def _action_key(self, action):
+        """Stable identity for an action (Python wrappers may be recreated)."""
+        return sip.unwrapinstance(action)
+
+    def _create_split_group(self, title, large_actions, small_actions, options=None):
+        """Create a group with large buttons followed by a column grid of
+        small labelled buttons (see PROJECT_TAB_GROUPS for the options)."""
+        options = options or {}
+        rows = options.get("rows", 3)
+        icon_size = options.get("icon_size")
+        group = QFrame()
+        group.setObjectName("ribbonGroup")
+        group.setStyleSheet(GROUP_FRAME_STYLE)
+
+        main_layout = QVBoxLayout(group)
+        main_layout.setContentsMargins(4, 2, 4, 0)
+        main_layout.setSpacing(0)
+
+        row_layout = QHBoxLayout()
+        row_layout.setSpacing(2)
+        for action in large_actions:
+            btn = self._make_arranged_button(action, True, group)
+            if btn is not None:
+                row_layout.addWidget(btn)
+        small_buttons = [
+            btn
+            for btn in (
+                self._make_arranged_button(
+                    a, False, group, labeled=options.get("labels", True)
+                )
+                for a in small_actions
+            )
+            if btn is not None
+        ]
+        if small_buttons:
+            grid = QGridLayout()
+            grid.setSpacing(1)
+            grid.setContentsMargins(0, 0, 0, 0)
+            for i, btn in enumerate(small_buttons):
+                if icon_size:
+                    btn.setIconSize(QSize(icon_size, icon_size))
+                    btn.setFixedHeight(icon_size + 8)
+                    btn.setMinimumWidth(btn.sizeHint().width())
+                grid.addWidget(
+                    btn, i % rows, i // rows, alignment=Qt.AlignmentFlag.AlignLeft
+                )
+            row_layout.addLayout(grid)
+            row_layout.setAlignment(grid, Qt.AlignmentFlag.AlignTop)
+        main_layout.addLayout(row_layout)
+        main_layout.addStretch()
+        self._add_group_title(main_layout, title)
+        return group
+
+    def _make_arranged_button(self, action, large, parent, labeled=True):
+        """Create a labelled button for a split group; None if unsupported."""
+        if isinstance(action, QWidgetAction):
+            source = action.defaultWidget()
+            if not isinstance(source, QToolButton):
+                return None
+            btn = self._clone_widget_button(
+                source,
+                large=large,
+                parent=parent,
+                popup=source.menu() is not None,
+                labeled=labeled,
+            )
+        else:
+            btn = self._make_button(
+                action,
+                large=large,
+                popup=action.menu() is not None,
+                labeled=labeled,
+                parent=parent,
+            )
+
+        # Submenu actions usually have no objectName; use the menu's instead
+        name = (
+            self._entry_names.get(self._action_key(action))
+            or action.objectName()
+            or (action.menu().objectName() if action.menu() is not None else "")
+        )
+        short_label = SHORT_LABELS.get(name)
+        icon_file = ICON_OVERRIDES.get(name)
+        icon = None
+        if icon_file:
+            if not icon_file.startswith(":"):
+                icon_file = str(Path(__file__).parent / icon_file)
+            icon = QIcon(icon_file)
+        if short_label or icon:
+
+            def apply_overrides(btn=btn, label=short_label, icon=icon):
+                if sip.isdeleted(btn):
+                    return
+                if label:
+                    btn.setText(label)
+                if icon:
+                    btn.setIcon(icon)
+
+            apply_overrides()
+            # The button resets its text and icon from the action on every
+            # change (e.g. when checked or enabled), so reapply afterwards
+            action.changed.connect(apply_overrides)
+
+        # Actions without an icon keep their label even when listed
+        if name in ICON_ONLY and (icon or not action.icon().isNull()):
+            btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+            btn.setMinimumWidth(0)
+        # Never shrink below the label width (Qt would elide the text)
+        if labeled:
+            btn.setMinimumWidth(max(btn.minimumWidth(), btn.sizeHint().width()))
+        return btn
 
     def _add_toolbar_groups(
         self, layout, menu_name, all_toolbars, seen_ids, empty_toolbar_action_ids
@@ -353,13 +1011,18 @@ class RibbonWidget(QTabWidget):
                 continue
             is_primary = tb_name in LARGE_ICONS
             title = tb.windowTitle() or tb_name
-            group = self._create_group(
-                title,
-                tb.actions(),
-                large=is_primary,
-                source_kind="toolbar",
-                source_name=tb_name,
-            )
+            if tb_name in TOOLBAR_GROUP_OPTIONS:
+                group = self._create_toolbar_split_group(
+                    title, tb.actions(), TOOLBAR_GROUP_OPTIONS[tb_name]
+                )
+            else:
+                group = self._create_group(
+                    title,
+                    tb.actions(),
+                    large=is_primary,
+                    source_kind="toolbar",
+                    source_name=tb_name,
+                )
             layout.addWidget(group)
             self._track_toolbar_actions(tb, seen_ids, empty_toolbar_action_ids)
 
@@ -368,7 +1031,7 @@ class RibbonWidget(QTabWidget):
         for a in toolbar.actions():
             if a.isSeparator():
                 continue
-            action_id = id(a)
+            action_id = self._action_key(a)
             seen_ids.add(action_id)
             if not self._clean_text(a.text()):
                 empty_toolbar_action_ids.add(action_id)
@@ -380,18 +1043,14 @@ class RibbonWidget(QTabWidget):
             name = tb.objectName()
             if not name or name in mapped_toolbars or not tb.actions():
                 continue
-            group = self._create_group(
-                tb.windowTitle() or name,
-                tb.actions(),
-                large=False,
-                source_kind="toolbar",
-                source_name=name,
+            group = self._create_toolbar_split_group(
+                tb.windowTitle() or name, tb.actions(), PLUGIN_TOOLBAR_OPTIONS
             )
             layout.addWidget(group)
             for a in tb.actions():
                 if a.isSeparator():
                     continue
-                seen_ids.add(id(a))
+                seen_ids.add(self._action_key(a))
 
     def _add_menu_group(
         self,
@@ -402,31 +1061,51 @@ class RibbonWidget(QTabWidget):
         empty_toolbar_action_ids,
     ):
         """Add menu actions as a group, excluding actions already shown by toolbars."""
+        if menu_name in MENU_GROUP_REPLACEMENTS:
+            for title, large_names, small_names, *options in MENU_GROUP_REPLACEMENTS[
+                menu_name
+            ]:
+                large_actions = self._resolve_actions(large_names, set())
+                small_actions = self._resolve_actions(small_names, set())
+                if large_actions or small_actions:
+                    layout.addWidget(
+                        self._create_split_group(
+                            title, large_actions, small_actions, *options
+                        )
+                    )
+            return
+
         menu_actions = [
             a
             for a in menu.actions()
             if not a.isSeparator()
-            and (id(a) not in seen_ids or id(a) in empty_toolbar_action_ids)
+            and (
+                self._action_key(a) not in seen_ids
+                or self._action_key(a) in empty_toolbar_action_ids
+            )
         ]
         if menu_actions:
             clean_title = menu.title().replace("&", "") + " Menu"
-            group = self._create_group(
-                clean_title,
-                menu_actions,
-                large=menu_name in LARGE_ICONS,
-                source_kind="menu",
-                source_name=menu_name,
-            )
+            if menu_name in MENU_GROUP_OPTIONS:
+                group = self._create_toolbar_split_group(
+                    clean_title, menu_actions, MENU_GROUP_OPTIONS[menu_name]
+                )
+            else:
+                group = self._create_group(
+                    clean_title,
+                    menu_actions,
+                    large=menu_name in LARGE_ICONS,
+                    source_kind="menu",
+                    source_name=menu_name,
+                )
             layout.addWidget(group)
 
     def _build_extra_tab(self, all_toolbars):
-        """Build the 'Tools' tab for additional QGIS toolbars."""
+        """Build the 'Styling' tab for layer styling and additional QGIS
+        toolbars."""
         extra_names = [
-            ("mSnappingToolBar", "Snapping"),
             ("mLabelToolBar", "Labels"),
-            ("mSelectionToolBar", "Selection"),
             ("mAnnotationsToolBar", "Annotations"),
-            ("mGpsToolBar", "GPS"),
         ]
         container = QWidget()
         layout = QHBoxLayout(container)
@@ -434,20 +1113,50 @@ class RibbonWidget(QTabWidget):
         layout.setSpacing(2)
 
         has_content = False
+        for title, large_names, small_names, *options in STYLING_TAB_LEADING_GROUPS:
+            large_actions = self._resolve_actions(large_names, set())
+            small_actions = self._resolve_actions(small_names, set())
+            if large_actions or small_actions:
+                layout.addWidget(
+                    self._create_split_group(
+                        title, large_actions, small_actions, *options
+                    )
+                )
+                has_content = True
+
         for tb_name, title in extra_names:
             tb = all_toolbars.get(tb_name)
             if not tb or not tb.actions():
                 continue
             is_primary = tb_name in LARGE_ICONS
-            group = self._create_group(
-                title,
-                tb.actions(),
-                large=is_primary,
-                source_kind="toolbar",
-                source_name=tb_name,
+            extra_actions = self._resolve_actions(
+                STYLING_TAB_EXTRA_ENTRIES.get(tb_name, []), set()
             )
+            if tb_name in TOOLBAR_GROUP_OPTIONS:
+                group = self._create_toolbar_split_group(
+                    title, tb.actions() + extra_actions, TOOLBAR_GROUP_OPTIONS[tb_name]
+                )
+            else:
+                group = self._create_group(
+                    title,
+                    tb.actions() + extra_actions,
+                    large=is_primary,
+                    source_kind="toolbar",
+                    source_name=tb_name,
+                )
             layout.addWidget(group)
             has_content = True
+
+        for title, large_names, small_names, *options in STYLING_TAB_GROUPS:
+            large_actions = self._resolve_actions(large_names, set())
+            small_actions = self._resolve_actions(small_names, set())
+            if large_actions or small_actions:
+                layout.addWidget(
+                    self._create_split_group(
+                        title, large_actions, small_actions, *options
+                    )
+                )
+                has_content = True
 
         layout.addStretch()
         if has_content:
@@ -459,6 +1168,54 @@ class RibbonWidget(QTabWidget):
             scroll.setWidget(container)
             return scroll
         return None
+
+    def _create_toolbar_split_group(self, title, actions, options):
+        """Create a split group for toolbar actions (TOOLBAR_GROUP_OPTIONS)."""
+        large_names = options.get("large", [])
+        actions = [a for a in actions if not a.isSeparator()]
+        if "only" in options:
+            actions = [a for a in actions if a.objectName() in options["only"]]
+        excluded = options.get("exclude", [])
+        actions = [a for a in actions if a.objectName() not in excluded]
+        return self._create_split_group(
+            title,
+            [a for a in actions if a.objectName() in large_names],
+            [a for a in actions if a.objectName() not in large_names],
+            options,
+        )
+
+    def _build_toolbar_tab(self, toolbar_names, all_toolbars):
+        """Build a tab with one split group per toolbar (see TOOLBAR_TABS);
+        None if none of the toolbars has actions."""
+        container = QWidget()
+        layout = QHBoxLayout(container)
+        layout.setContentsMargins(4, 2, 4, 2)
+        layout.setSpacing(2)
+
+        has_content = False
+        for tb_name in toolbar_names:
+            tb = all_toolbars.get(tb_name)
+            if not tb or not tb.actions():
+                continue
+            layout.addWidget(
+                self._create_toolbar_split_group(
+                    tb.windowTitle() or tb_name,
+                    tb.actions(),
+                    TOOLBAR_GROUP_OPTIONS.get(tb_name, {}),
+                )
+            )
+            has_content = True
+
+        if not has_content:
+            return None
+        layout.addStretch()
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setWidget(container)
+        return scroll
 
     def _build_plugins_extra_tab(self, plugin_toolbars):
         """Build additional groups for plugin toolbars."""
@@ -478,32 +1235,6 @@ class RibbonWidget(QTabWidget):
             layout.addWidget(group)
         layout.addStretch()
         return container
-
-    def _build_selection_tab(self, selection_menu):
-        """Build the Selection tab from the Edit > Select submenu."""
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.Shape.NoFrame)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-
-        container = QWidget()
-        layout = QHBoxLayout(container)
-        layout.setContentsMargins(4, 2, 4, 2)
-        layout.setSpacing(2)
-
-        # Create a single group with all selection actions
-        group = self._create_group(
-            "Selection",
-            selection_menu.actions(),
-            large=True,
-            source_kind="menu",
-            source_name="mSelectionMenu",
-        )
-        layout.addWidget(group)
-        layout.addStretch()
-        scroll.setWidget(container)
-        return scroll
 
     def _create_group(
         self, title, actions, large=False, source_kind=None, source_name=None
@@ -528,13 +1259,15 @@ class RibbonWidget(QTabWidget):
             )
             main_layout.addLayout(grid)
 
-        # Group title at bottom
+        self._add_group_title(main_layout, title)
+        return group
+
+    def _add_group_title(self, main_layout, title):
+        """Add the group title at the bottom of a group."""
         title_label = QLabel(title)
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title_label.setStyleSheet(GROUP_TITLE_STYLE)
         main_layout.addWidget(title_label)
-
-        return group
 
     def _create_large_button_layout(self, actions, source_kind, source_name, parent):
         """Create a horizontal layout with large buttons."""
@@ -671,24 +1404,49 @@ class RibbonWidget(QTabWidget):
     def _is_popup_widget_button(self, source_name, source):
         return (source_name, self._widget_popup_id(source)) in WIDGET_POPUP_BUTTONS
 
-    def _clone_widget_button(self, source, large=False, source_name=None, parent=None):
+    def _clone_widget_button(
+        self,
+        source,
+        large=False,
+        source_name=None,
+        parent=None,
+        popup=None,
+        labeled=False,
+    ):
         """Clone a QToolButton from a QWidgetAction's defaultWidget.
-        Returns None for non-QToolButton widgets (spinboxes, etc.)."""
+        Returns None for non-QToolButton widgets (spinboxes, etc.).
+        popup/labeled: as for _make_button."""
         if not isinstance(source, QToolButton):
             return None
         clone = QToolButton(parent)
         clone.setIcon(source.icon())
         clone.setToolTip(source.toolTip())
         clone.setAutoRaise(True)
-        if self._is_popup_widget_button(source_name, source):
+        if popup is None:
+            popup = self._is_popup_widget_button(source_name, source)
+        if popup:
             clone.setMenu(source.menu())
             clone.setPopupMode(source.popupMode())
         # Wire click through to the hidden original so all internal logic fires
         clone.clicked.connect(source.click)
+        if labeled:
+            default_action = source.defaultAction()
+            clone.setText(
+                self._clean_text(default_action.text() if default_action else "")
+                or self._clean_text(source.toolTip())
+            )
         if large:
             clone.setIconSize(QSize(28, 28))
             clone.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
-            clone.setFixedSize(56, 70)
+            if labeled:
+                clone.setFixedHeight(70)
+                clone.setMinimumWidth(56)
+            else:
+                clone.setFixedSize(56, 70)
+        elif labeled:
+            clone.setIconSize(QSize(18, 18))
+            clone.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+            clone.setFixedHeight(22)
         else:
             clone.setIconSize(QSize(18, 18))
             if source.icon().isNull():
@@ -716,14 +1474,46 @@ class RibbonWidget(QTabWidget):
         popup_menu.clear()
         popup_menu.addActions(source_menu.actions())
 
+    def _make_button_menu(self, entries, parent):
+        """Build a dropdown of relabelled proxies for BUTTON_MENUS entries."""
+        menu = QMenu(parent)
+        for name, label in entries:
+            source = self.main_window.findChild(QAction, name)
+            if source is None:
+                continue
+            proxy = menu.addAction(source.icon(), label)
+            proxy.triggered.connect(source.trigger)
+
+            def sync(proxy=proxy, source=source):
+                if not sip.isdeleted(proxy):
+                    proxy.setEnabled(source.isEnabled())
+
+            sync()
+            source.changed.connect(sync)
+        return menu
+
     def _make_button(
-        self, action, large=False, source_kind=None, source_name=None, parent=None
+        self,
+        action,
+        large=False,
+        source_kind=None,
+        source_name=None,
+        parent=None,
+        popup=None,
+        labeled=False,
     ):
-        """Create a QToolButton for a ribbon action."""
+        """Create a QToolButton for a ribbon action.
+
+        popup: show the action's submenu as a popup (default: looked up in
+        the *_POPUP_ACTIONS sets). labeled: always show the full label
+        (small buttons get text beside the icon, large ones grow in width).
+        """
         btn = QToolButton(parent)
         btn.setAutoRaise(True)
 
-        if self._is_popup_action(source_kind, source_name, action):
+        if popup is None:
+            popup = self._is_popup_action(source_kind, source_name, action)
+        if popup:
             source_menu = action.menu()
             self._sync_menu_button(btn, action)
             popup_menu = QMenu(btn)
@@ -740,14 +1530,36 @@ class RibbonWidget(QTabWidget):
             )
         else:
             btn.setDefaultAction(action)
+            entries = BUTTON_MENUS.get(action.objectName())
+            if isinstance(entries, str):
+                # Show an existing QGIS menu (kept up to date by QGIS)
+                button_menu = self.main_window.findChild(QMenu, entries)
+            elif entries:
+                button_menu = self._make_button_menu(entries, btn)
+            else:
+                button_menu = None
+            if button_menu is not None:
+                btn.setMenu(button_menu)
+                btn.setPopupMode(QToolButton.ToolButtonPopupMode.MenuButtonPopup)
 
         if large:
             btn.setIconSize(QSize(28, 28))
             btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
-            btn.setFixedSize(56, 70)
+            if labeled:
+                btn.setFixedHeight(70)
+                btn.setMinimumWidth(56)
+            else:
+                btn.setFixedSize(56, 70)
         else:
             btn.setIconSize(QSize(18, 18))
-            if action.icon() and not action.icon().isNull():
+            if labeled or action.objectName() in LABELED_ACTIONS:
+                btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+                if action.icon().isNull():
+                    # Blank icon keeps labels aligned with iconed buttons
+                    blank = QPixmap(18, 18)
+                    blank.fill(Qt.GlobalColor.transparent)
+                    btn.setIcon(QIcon(blank))
+            elif action.icon() and not action.icon().isNull():
                 btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
             else:
                 btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
