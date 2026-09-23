@@ -1,5 +1,5 @@
 # Ribbon Toolbar
-![icon](ribbon_toolbar/icon.svg)
+![icon](qgis_tabbed_ui/icon.svg)
 
 A QGIS plugin that replaces the default menus and toolbars with a Microsoft Office-like ribbon interface.
 
