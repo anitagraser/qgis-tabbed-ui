@@ -1,5 +1,0 @@
-plugin_path: qgis_tabbed_ui
-github_organization_slug: eithanwes
-project_slug: qgis-tabbed-ui
-changelog_regexp: \*\*unreleased\*\*
-changelog_include_tag_name: true
