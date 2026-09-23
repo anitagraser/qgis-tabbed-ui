@@ -12,6 +12,7 @@ PLUGIN_DIR = REPO_DIR / "qgis_tabbed_ui"
 sys.path.insert(0, str(REPO_DIR))
 
 from qgis_tabbed_ui import tabs  # noqa: E402
+from qgis_tabbed_ui.tabs.spec import ArrangedTab, MenuTab, ToolbarTab  # noqa: E402
 
 
 def test_icon_overrides_exist():
@@ -28,6 +29,15 @@ def test_metadata_icon_exists():
         if line.startswith("icon=")
     )
     assert (PLUGIN_DIR / icon).is_file()
+
+
+def test_every_tab_module_defines_a_tab():
+    for module in tabs.TAB_MODULES:
+        assert isinstance(module.TAB, (ArrangedTab, MenuTab, ToolbarTab)), module
+
+
+def test_one_default_tab():
+    assert len([spec for spec in tabs.TABS if spec.default]) == 1
 
 
 def test_merge_rejects_duplicate_keys():

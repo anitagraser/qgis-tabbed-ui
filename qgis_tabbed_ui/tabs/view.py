@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
-"""View tab: hand-arranged groups from the View menu (built together with
-the Home tab, see tabs/__init__.py)."""
+"""View tab: hand-arranged groups from the View menu (resolved together
+with the Home tab, which shares the View menu)."""
+
+from .spec import ArrangedTab
 
 GROUPS = [
     ("Map Views", ["mActionNewMapCanvas"], ["mViewMenu>3D Map Views", "mActionDraw"]),
@@ -38,6 +40,8 @@ EXCLUDED = [
     "mActionToggleMapOnly",
     "mActionShowBookmarks",
 ]
+
+TAB = ArrangedTab(menu="mViewMenu", title="View", groups=GROUPS, excluded=EXCLUDED)
 
 SHORT_LABELS = {
     "dock:Overview": "Show Overview",

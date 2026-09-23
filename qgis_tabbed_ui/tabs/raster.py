@@ -1,12 +1,15 @@
 # -*- coding: utf-8 -*-
 """Raster tab: the Raster menu and toolbar."""
 
-EXTRA_TAB_GROUPS = {
-    "mRasterMenu": [
+from .spec import MenuTab
+
+TAB = MenuTab(
+    menu="mRasterMenu",
+    leading_groups=[
         ("Georeferencer", ["mActionShowGeoreferencer"], []),
         ("Raster Calculator", ["mActionShowRasterCalculator"], []),
     ],
-}
+)
 
 TOOLBAR_GROUP_OPTIONS = {
     # Two rows keep the local/full and increase/decrease pairs together

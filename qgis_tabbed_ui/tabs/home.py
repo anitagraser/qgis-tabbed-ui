@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
-"""Home tab: hand-arranged groups from the View and Layer menus (built
-together with the View tab, see tabs/__init__.py)."""
+"""Home tab: hand-arranged groups from the View and Layer menus (resolved
+together with the View tab, which shares the View menu)."""
+
+from .spec import ArrangedTab
 
 # Shared by the Home and Vector tabs
 SELECTION_GROUP = (
@@ -86,6 +88,10 @@ EXCLUDED = [
     "mActionPasteStyle",
     "mAddLayerMenu",
 ]
+
+TAB = ArrangedTab(
+    menu="mViewMenu", title="Home", groups=GROUPS, excluded=EXCLUDED, default=True
+)
 
 SHORT_LABELS = {
     "mActionDataSourceManager": "Add Layer",

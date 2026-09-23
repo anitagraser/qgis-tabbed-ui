@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
 Ribbon widget — a QTabWidget styled like a Microsoft Office ribbon.
-Each tab corresponds to a QGIS menu. Within each tab, actions are
-organized into labeled groups with large/small icon buttons. The
-per-tab layout is configured in the tabs package (one module per tab).
+Tabs show QGIS menus and toolbars, with actions organized into labeled
+groups with large/small icon buttons. Each tab is described by a module of
+the tabs package.
 """
 
 import re
@@ -31,23 +31,15 @@ from qgis.PyQt.QtWidgets import (
 )
 
 from .tabs import (
-    ARRANGED_TABS,
     BUTTON_MENUS,
-    DEFAULT_TAB,
-    EXTRA_TAB_GROUPS,
     ICON_ONLY,
     ICON_OVERRIDES,
     LABELED_ACTIONS,
-    MENU_GROUP_REPLACEMENTS,
-    MERGED_TABS,
     SHORT_LABELS,
-    TAB_ORDER,
+    TABS,
     TOOLBAR_GROUP_OPTIONS,
-    TOOLBAR_TABS,
-    TRAILING_TAB_ORDER,
-    plugins,
-    styling,
 )
+from .tabs.spec import ArrangedTab, MenuTab
 
 # Mapping: menu objectName -> list of related toolbar objectNames
 MENU_TOOLBAR_MAP = {
@@ -153,26 +145,24 @@ class RibbonWidget(QTabWidget):
         self.setDocumentMode(False)
 
     def build_ribbon(self):
-        """Populate the ribbon with tabs from QGIS menus and toolbars."""
-        menubar = self.main_window.menuBar()
+        """Populate the ribbon with the tabs in TABS (see tabs/spec.py)."""
         all_toolbars = self._collect_all_toolbars()
-        menus_by_name = self._collect_menus_by_name(menubar)
+        menus_by_name = self._collect_menus_by_name(self.main_window.menuBar())
+        arranged_tabs = self._build_arranged_tabs(menus_by_name, all_toolbars)
 
-        # Build tabs in order
-        for menu_name in TAB_ORDER:
-            self._build_standard_menu_tab(menu_name, menus_by_name, all_toolbars)
-
-        for title, toolbar_names in TOOLBAR_TABS:
-            tab = self._build_toolbar_tab(toolbar_names, all_toolbars)
-            if tab:
-                self.addTab(tab, title)
-
-        styling_tab = self._build_styling_tab(all_toolbars)
-        if styling_tab:
-            self.addTab(styling_tab, "Styling")
-
-        for menu_name in TRAILING_TAB_ORDER:
-            self._build_standard_menu_tab(menu_name, menus_by_name, all_toolbars)
+        for spec in TABS:
+            if isinstance(spec, ArrangedTab):
+                tab = arranged_tabs.get(spec)
+            elif isinstance(spec, MenuTab):
+                tab = self._build_menu_tab(spec, menus_by_name, all_toolbars)
+            else:
+                tab = self._build_toolbar_tab(spec, all_toolbars)
+            if tab is None:
+                continue
+            title, page = tab
+            self.addTab(page, title)
+            if spec.default:
+                self.setCurrentWidget(page)
 
     def _collect_all_toolbars(self):
         """Collect all toolbars from the main window."""
@@ -227,137 +217,113 @@ class RibbonWidget(QTabWidget):
         scroll.setWidget(container)
         return scroll, layout
 
-    def _build_standard_menu_tab(self, menu_name, menus_by_name, all_toolbars):
-        """Build a standard menu tab."""
-        menu = menus_by_name.get(menu_name)
+    def _build_menu_tab(self, spec, menus_by_name, all_toolbars):
+        """Build a MenuTab. Returns (title, page), None if its menu is
+        missing."""
+        menu = menus_by_name.get(spec.menu)
         if menu is None:
-            return
-
-        clean_title = menu.title().replace("&", "")
-        if menu_name in ARRANGED_TABS:
-            tabs = self._build_arranged_tabs(menu, menu_name, all_toolbars)
-        else:
-            menus = [
-                (name, menus_by_name[name])
-                for name in MERGED_TABS.get(menu_name, [])
-                if name in menus_by_name
-            ] + [(menu_name, menu)]
-            tabs = [(None, self._build_tab(menus, all_toolbars))]
-        for i, (title, tab) in enumerate(tabs):
-            self.addTab(tab, title or clean_title)
-            if menu_name == DEFAULT_TAB and i == 0:
-                self.setCurrentWidget(tab)
-
-    def _build_tab(self, menus, all_toolbars):
-        """Build a single ribbon tab for one or more QGIS menus, given as
-        (menu objectName, menu) pairs."""
+            return None
         page, layout = self._make_tab_page()
 
         # Track action identities and toolbar-only actions
         seen_ids = set()
         empty_toolbar_action_ids = set()
 
-        for menu_name, menu in menus:
-            self._add_standard_groups(
+        # Marked as seen so the menu groups do not repeat them
+        self._add_arranged_groups(layout, spec.leading_groups, seen_ids)
+
+        menus = [
+            (name, menus_by_name[name])
+            for name in spec.merged_menus
+            if name in menus_by_name
+        ] + [(spec.menu, menu)]
+        for menu_name, m in menus:
+            self._add_toolbar_groups(
+                layout, menu_name, all_toolbars, seen_ids, empty_toolbar_action_ids
+            )
+            if menu_name == spec.menu and spec.plugin_toolbar_options is not None:
+                self._add_plugin_toolbars(
+                    layout, spec.plugin_toolbar_options, seen_ids
+                )
+            self._add_menu_group(
                 layout,
-                menu,
+                m,
                 menu_name,
-                all_toolbars,
+                spec.menu_groups,
                 seen_ids,
                 empty_toolbar_action_ids,
             )
 
         layout.addStretch()
-        return page
+        return spec.title or menu.title().replace("&", ""), page
 
-    def _add_standard_groups(
-        self,
-        layout,
-        menu,
-        menu_name,
-        all_toolbars,
-        seen_ids,
-        empty_toolbar_action_ids,
-    ):
-        """Add the groups of a standard (not arranged) menu tab to layout."""
-        # Marked as seen so the menu group does not repeat them
-        self._add_arranged_groups(layout, EXTRA_TAB_GROUPS.get(menu_name, []), seen_ids)
+    def _build_arranged_tabs(self, menus_by_name, all_toolbars):
+        """Build all ArrangedTabs, resolving the tabs of each menu together.
+        Returns {spec: (title, page)}; tabs whose menu is missing are left
+        out."""
+        specs_by_menu = {}
+        for spec in TABS:
+            if isinstance(spec, ArrangedTab):
+                specs_by_menu.setdefault(spec.menu, []).append(spec)
 
-        # Add toolbar-based groups first
-        self._add_toolbar_groups(
-            layout,
-            menu_name,
-            all_toolbars,
-            seen_ids,
-            empty_toolbar_action_ids,
-        )
-
-        # If this is the Plugins menu tab, also add plugin toolbars
-        if menu_name == "mPluginMenu":
-            self._add_plugin_toolbars_to_tab(layout, seen_ids)
-
-        # Add menu actions as a group
-        self._add_menu_group(
-            layout, menu, menu_name, seen_ids, empty_toolbar_action_ids
-        )
-
-    def _build_arranged_tabs(self, menu, menu_name, all_toolbars):
-        """Build the tab(s) for a menu from its hand-arranged groups in
-        ARRANGED_TABS. Returns a list of (title, tab widget)."""
-        excluded, tab_specs = ARRANGED_TABS[menu_name]
-        placed_ids = set()
-        self._resolve_actions(excluded, placed_ids)
-
-        # Resolve groups with "name/*" expansions last, so actions named
-        # explicitly anywhere (even on a later tab) are not claimed by them
-        def has_expansion(group):
-            return any(
-                isinstance(n, str) and n.endswith("/*")
-                for n in group[1] + group[2]
-            )
-
-        all_groups = [g for _, groups in tab_specs for g in groups]
-        resolved = {}
-        for group in sorted(all_groups, key=has_expansion):
-            resolved[id(group)] = (
-                self._resolve_actions(group[1], placed_ids),
-                self._resolve_actions(group[2], placed_ids),
-            )
-
-        tabs = []
-        layouts = []
-        for tab_title, groups in tab_specs:
-            page, layout = self._make_tab_page()
-            for group in groups:
-                title, _, _, *options = group
-                large_actions, small_actions = resolved[id(group)]
-                if large_actions or small_actions:
-                    layout.addWidget(
-                        self._create_split_group(
-                            title, large_actions, small_actions, *options
-                        )
-                    )
-            tabs.append((tab_title, page))
-            layouts.append(layout)
-
-        # Keep anything not arranged above (e.g. added by plugins) reachable
-        sources = list(menu.actions())
-        for tb_name in MENU_TOOLBAR_MAP.get(menu_name, []):
-            tb = all_toolbars.get(tb_name)
-            if tb:
-                sources += tb.actions()
-        leftovers = []
-        for action in sources:
-            if action.isSeparator() or self._action_key(action) in placed_ids:
+        built = {}
+        for menu_name, specs in specs_by_menu.items():
+            menu = menus_by_name.get(menu_name)
+            if menu is None:
                 continue
-            placed_ids.add(self._action_key(action))
-            leftovers.append(action)
-        if leftovers:
-            layouts[0].addWidget(self._create_split_group("More", [], leftovers))
+            placed_ids = set()
+            for spec in specs:
+                self._resolve_actions(spec.excluded, placed_ids)
 
-        for layout in layouts:
-            layout.addStretch()
-        return tabs
+            # Resolve groups with "name/*" expansions last, so actions named
+            # explicitly anywhere (even on a later tab) are not claimed by them
+            def has_expansion(group):
+                return any(
+                    isinstance(n, str) and n.endswith("/*")
+                    for n in group[1] + group[2]
+                )
+
+            all_groups = [g for spec in specs for g in spec.groups]
+            resolved = {}
+            for group in sorted(all_groups, key=has_expansion):
+                resolved[id(group)] = (
+                    self._resolve_actions(group[1], placed_ids),
+                    self._resolve_actions(group[2], placed_ids),
+                )
+
+            layouts = []
+            for spec in specs:
+                page, layout = self._make_tab_page()
+                for group in spec.groups:
+                    title, _, _, *options = group
+                    large_actions, small_actions = resolved[id(group)]
+                    if large_actions or small_actions:
+                        layout.addWidget(
+                            self._create_split_group(
+                                title, large_actions, small_actions, *options
+                            )
+                        )
+                built[spec] = (spec.title or menu.title().replace("&", ""), page)
+                layouts.append(layout)
+
+            # Keep anything not arranged above (e.g. added by plugins) reachable
+            sources = list(menu.actions())
+            for tb_name in MENU_TOOLBAR_MAP.get(menu_name, []):
+                tb = all_toolbars.get(tb_name)
+                if tb:
+                    sources += tb.actions()
+            leftovers = []
+            for action in sources:
+                if action.isSeparator() or self._action_key(action) in placed_ids:
+                    continue
+                placed_ids.add(self._action_key(action))
+                leftovers.append(action)
+            if leftovers:
+                layouts[0].addWidget(self._create_split_group("More", [], leftovers))
+
+            for layout in layouts:
+                layout.addStretch()
+        return built
 
     def _add_arranged_groups(self, layout, groups, placed_ids):
         """Add hand-arranged groups (see tabs/__init__.py) to layout, marking
@@ -594,15 +560,16 @@ class RibbonWidget(QTabWidget):
             if not self._clean_text(a.text()):
                 empty_toolbar_action_ids.add(action_id)
 
-    def _add_plugin_toolbars_to_tab(self, layout, seen_ids):
-        """Add plugin toolbars to the Plugins menu tab."""
+    def _add_plugin_toolbars(self, layout, options, seen_ids):
+        """Add a split group with the given options per third-party plugin
+        toolbar."""
         mapped_toolbars = self._get_mapped_toolbars_set()
         for tb in self.main_window.findChildren(QToolBar):
             name = tb.objectName()
             if not name or name in mapped_toolbars or not tb.actions():
                 continue
             group = self._create_toolbar_split_group(
-                tb.windowTitle() or name, tb.actions(), plugins.PLUGIN_TOOLBAR_OPTIONS
+                tb.windowTitle() or name, tb.actions(), options
             )
             layout.addWidget(group)
             for a in tb.actions():
@@ -615,14 +582,14 @@ class RibbonWidget(QTabWidget):
         layout,
         menu,
         menu_name,
+        replacements,
         seen_ids,
         empty_toolbar_action_ids,
     ):
-        """Add menu actions as a group, excluding actions already shown by toolbars."""
-        if menu_name in MENU_GROUP_REPLACEMENTS:
-            self._add_arranged_groups(
-                layout, MENU_GROUP_REPLACEMENTS[menu_name], set()
-            )
+        """Add menu actions as a group, excluding actions already shown by
+        toolbars, or the menu's replacement groups (MenuTab.menu_groups)."""
+        if menu_name in replacements:
+            self._add_arranged_groups(layout, replacements[menu_name], set())
             return
 
         menu_actions = [
@@ -640,34 +607,6 @@ class RibbonWidget(QTabWidget):
                 self._create_group(clean_title, menu_actions, menu_name=menu_name)
             )
 
-    def _build_styling_tab(self, all_toolbars):
-        """Build the Styling tab (see tabs/styling.py); None if empty."""
-        page, layout = self._make_tab_page()
-
-        has_content = self._add_arranged_groups(
-            layout, styling.LEADING_GROUPS, set()
-        )
-
-        for tb_name, title in styling.TOOLBARS:
-            tb = all_toolbars.get(tb_name)
-            if not tb or not tb.actions():
-                continue
-            extra_actions = self._resolve_actions(
-                styling.TOOLBAR_EXTRA_ENTRIES.get(tb_name, []), set()
-            )
-            layout.addWidget(
-                self._create_toolbar_group(title, tb_name, tb.actions() + extra_actions)
-            )
-            has_content = True
-
-        if self._add_arranged_groups(layout, styling.GROUPS, set()):
-            has_content = True
-
-        if not has_content:
-            return None
-        layout.addStretch()
-        return page
-
     def _create_toolbar_split_group(self, title, actions, options):
         """Create a split group for toolbar actions (TOOLBAR_GROUP_OPTIONS)."""
         large_names = options.get("large", [])
@@ -683,29 +622,35 @@ class RibbonWidget(QTabWidget):
             options,
         )
 
-    def _build_toolbar_tab(self, toolbar_names, all_toolbars):
-        """Build a tab with one split group per toolbar (see TOOLBAR_TABS);
-        None if none of the toolbars has actions."""
+    def _build_toolbar_tab(self, spec, all_toolbars):
+        """Build a ToolbarTab. Returns (title, page), None if empty."""
         page, layout = self._make_tab_page()
 
-        has_content = False
-        for tb_name in toolbar_names:
+        has_content = self._add_arranged_groups(layout, spec.leading_groups, set())
+
+        for tb_name, title in spec.toolbars:
             tb = all_toolbars.get(tb_name)
             if not tb or not tb.actions():
                 continue
+            extra_actions = self._resolve_actions(
+                spec.toolbar_extra_entries.get(tb_name, []), set()
+            )
             layout.addWidget(
                 self._create_toolbar_split_group(
-                    tb.windowTitle() or tb_name,
-                    tb.actions(),
+                    title or tb.windowTitle() or tb_name,
+                    tb.actions() + extra_actions,
                     TOOLBAR_GROUP_OPTIONS.get(tb_name, {}),
                 )
             )
             has_content = True
 
+        if self._add_arranged_groups(layout, spec.trailing_groups, set()):
+            has_content = True
+
         if not has_content:
             return None
         layout.addStretch()
-        return page
+        return spec.title, page
 
     def _create_group(self, title, actions, menu_name=None):
         """Create a ribbon group: a framed grid of small buttons and a title.
