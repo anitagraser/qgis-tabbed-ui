@@ -29,6 +29,19 @@ class RibbonToolbarPlugin:
     # (inserted after its first action, "Layer Styling")
     LAYER_PANEL_ACTIONS = ["mActionCopyStyle", "mActionPasteStyle"]
 
+    # Toolbars shown when the ribbon is turned off if none was visible
+    # before it was turned on
+    DEFAULT_TOOLBARS = {
+        "mFileToolBar",
+        "mDigitizeToolBar",
+        "mMapNavToolBar",
+        "mAttributesToolBar",
+        "mPluginToolBar",
+        "mSnappingToolBar",
+        "mDataSourceManagerToolBar",
+        "mSelectionToolBar",
+    }
+
     def __init__(self, iface):
         self.iface = iface
         self.main_window = iface.mainWindow()
@@ -41,8 +54,7 @@ class RibbonToolbarPlugin:
         self._original_toolbar_visibility = {}
         self._original_menubar_visible = True
         self._original_menubar_max_height = None
-        self.plugin_dir = Path(__file__).parent
-        self.icons_dir = self.plugin_dir / "icons"
+        self.icons_dir = Path(__file__).parent / "icons"
         # Actions added to the Layers panel toolbar (+ trailing separator)
         self._layer_panel_toolbar = None
         self._layer_panel_added_actions = []
@@ -52,11 +64,10 @@ class RibbonToolbarPlugin:
 
     def initGui(self):
         """Called when plugin is loaded."""
-        icon_path = self.icons_dir / "icon.svg"
-        icon = QIcon(str(icon_path)) if icon_path.exists() else QIcon()
-
         # Toggle action
-        self.toggle_action = QAction(icon, "Toggle Ribbon Toolbar", self.main_window)
+        self.toggle_action = QAction(
+            self._icon("icon.svg"), "Toggle Ribbon Toolbar", self.main_window
+        )
         self.toggle_action.setCheckable(True)
         self.toggle_action.setChecked(True)
         self.toggle_action.triggered.connect(self._on_toggle)
@@ -65,7 +76,7 @@ class RibbonToolbarPlugin:
 
         # Show/hide the (collapsed) menubar while the ribbon is active
         self.menubar_action = QAction(
-            QIcon(str(self.icons_dir / "menubar.svg")),
+            self._icon("menubar.svg"),
             "Toggle Menu Bar",
             self.main_window,
         )
@@ -116,6 +127,21 @@ class RibbonToolbarPlugin:
         menubar = self.main_window.menuBar()
         menubar.setCornerWidget(QWidget())
 
+    def _icon(self, file_name):
+        """Load an icon from the plugin's icons folder (a null icon if the
+        file is missing)."""
+        return QIcon(str(self.icons_dir / file_name))
+
+    def _main_window_toolbars(self):
+        """Toolbars docked to the main window (not toolbars inside panels),
+        except the ribbon."""
+        return [
+            tb
+            for tb in self.main_window.findChildren(QToolBar)
+            if tb.parent() == self.main_window
+            and tb.objectName() != self.RIBBON_OBJECT_NAME
+        ]
+
     def _make_toggle_button(self, parent=None):
         """Create a tool button bound to the toggle action."""
         button = QToolButton(parent)
@@ -148,7 +174,7 @@ class RibbonToolbarPlugin:
     def _make_hamburger_button(self):
         """Create the hamburger button that gives access to all QGIS menus."""
         button = QToolButton()
-        button.setIcon(QIcon(str(self.icons_dir / "hamburger.svg")))
+        button.setIcon(self._icon("hamburger.svg"))
         button.setToolTip("Menu")
         button.setAutoRaise(True)
         button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
@@ -243,13 +269,9 @@ class RibbonToolbarPlugin:
 
         # Save current state
         self._original_menubar_visible = self.main_window.menuBar().isVisible()
-        self._original_toolbar_visibility = {}
-        for tb in self.main_window.findChildren(QToolBar):
-            if (
-                tb.objectName() != self.RIBBON_OBJECT_NAME
-                and tb.parent() == self.main_window
-            ):
-                self._original_toolbar_visibility[tb.objectName()] = tb.isVisible()
+        self._original_toolbar_visibility = {
+            tb.objectName(): tb.isVisible() for tb in self._main_window_toolbars()
+        }
 
         # Build the ribbon
         from .ribbon_widget import RibbonWidget
@@ -276,12 +298,8 @@ class RibbonToolbarPlugin:
         self.main_window.addToolBar(Qt.ToolBarArea.TopToolBarArea, self.ribbon_toolbar)
 
         # Hide toolbars docked to the main window only (not toolbars inside panels)
-        for tb in self.main_window.findChildren(QToolBar):
-            if (
-                tb.objectName() != self.RIBBON_OBJECT_NAME
-                and tb.parent() == self.main_window
-            ):
-                tb.setVisible(False)
+        for tb in self._main_window_toolbars():
+            tb.setVisible(False)
 
         # Collapse the menubar instead of hiding it: Qt only triggers menu
         # action shortcuts while the menubar is visible
@@ -308,8 +326,10 @@ class RibbonToolbarPlugin:
 
         self._remove_layer_panel_actions()
 
-        # Restore menubar
+        # Mark inactive before unchecking menubar_action, so its handler
+        # does not change the menubar height
         self.ribbon_active = False
+        # Restore menubar
         self.menubar_action.setChecked(False)
         menubar = self.main_window.menuBar()
         if self._original_menubar_max_height is not None:
@@ -323,27 +343,16 @@ class RibbonToolbarPlugin:
         )
 
         # Restore toolbars
-        default_toolbars = {
-            "mFileToolBar",
-            "mDigitizeToolBar",
-            "mMapNavToolBar",
-            "mAttributesToolBar",
-            "mPluginToolBar",
-            "mSnappingToolBar",
-            "mDataSourceManagerToolBar",
-            "mSelectionToolBar",
-        }
-        for tb in self.main_window.findChildren(QToolBar):
-            if tb.parent() != self.main_window or tb.isVisible() is True:
+        for tb in self._main_window_toolbars():
+            if tb.isVisible():
                 continue
             name = tb.objectName()
             if name in self._original_toolbar_visibility:
                 if all_toolbars_false:
                     # Show default toolbars if all were hidden
-                    tb.setVisible(name in default_toolbars)
+                    tb.setVisible(name in self.DEFAULT_TOOLBARS)
                 else:
                     # Otherwise restore original visibility
                     tb.setVisible(self._original_toolbar_visibility[name])
 
-        self.ribbon_active = False
         self.toggle_action.setChecked(False)
