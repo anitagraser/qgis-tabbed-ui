@@ -204,7 +204,7 @@ class RibbonWidget(QTabWidget):
         self.setStyleSheet(RIBBON_STYLESHEET)
         self.setMinimumHeight(95)
         self.setMaximumHeight(120)
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.setUsesScrollButtons(True)
         self.setDocumentMode(False)
 
@@ -306,9 +306,9 @@ class RibbonWidget(QTabWidget):
         """Build a single ribbon tab for a QGIS menu."""
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.NoFrame)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
         container = QWidget()
         layout = QHBoxLayout(container)
@@ -452,9 +452,9 @@ class RibbonWidget(QTabWidget):
         if has_content:
             scroll = QScrollArea()
             scroll.setWidgetResizable(True)
-            scroll.setFrameShape(QFrame.NoFrame)
-            scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-            scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+            scroll.setFrameShape(QFrame.Shape.NoFrame)
+            scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+            scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
             scroll.setWidget(container)
             return scroll
         return None
@@ -482,9 +482,9 @@ class RibbonWidget(QTabWidget):
         """Build the Selection tab from the Edit > Select submenu."""
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.NoFrame)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
         container = QWidget()
         layout = QHBoxLayout(container)
@@ -529,7 +529,7 @@ class RibbonWidget(QTabWidget):
 
         # Group title at bottom
         title_label = QLabel(title)
-        title_label.setAlignment(Qt.AlignCenter)
+        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title_label.setStyleSheet(GROUP_TITLE_STYLE)
         main_layout.addWidget(title_label)
 
@@ -595,8 +595,8 @@ class RibbonWidget(QTabWidget):
     def _add_separator_to_layout(self, layout):
         """Add a vertical separator line to a layout."""
         sep = QFrame()
-        sep.setFrameShape(QFrame.VLine)
-        sep.setFrameShadow(QFrame.Sunken)
+        sep.setFrameShape(QFrame.Shape.VLine)
+        sep.setFrameShadow(QFrame.Shadow.Sunken)
         sep.setFixedWidth(1)
         layout.addWidget(sep)
 
@@ -686,14 +686,14 @@ class RibbonWidget(QTabWidget):
         clone.clicked.connect(source.click)
         if large:
             clone.setIconSize(QSize(28, 28))
-            clone.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
+            clone.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
             clone.setFixedSize(56, 70)
         else:
             clone.setIconSize(QSize(18, 18))
             if source.icon().isNull():
-                clone.setToolButtonStyle(Qt.ToolButtonTextOnly)
+                clone.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
             else:
-                clone.setToolButtonStyle(Qt.ToolButtonIconOnly)
+                clone.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
             clone.setFixedHeight(22)
         return clone
 
@@ -733,7 +733,7 @@ class RibbonWidget(QTabWidget):
                 )
             )
             btn.setMenu(popup_menu)
-            btn.setPopupMode(QToolButton.InstantPopup)
+            btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
             action.changed.connect(
                 lambda btn=btn, action=action: self._sync_menu_button(btn, action)
             )
@@ -742,16 +742,16 @@ class RibbonWidget(QTabWidget):
 
         if large:
             btn.setIconSize(QSize(28, 28))
-            btn.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
+            btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
             btn.setFixedSize(56, 70)
         else:
             btn.setIconSize(QSize(18, 18))
             if action.icon() and not action.icon().isNull():
-                btn.setToolButtonStyle(Qt.ToolButtonIconOnly)
+                btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
             else:
-                btn.setToolButtonStyle(Qt.ToolButtonTextOnly)
+                btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
                 btn.setMaximumWidth(120)
-            btn.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+            btn.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
             btn.setFixedHeight(22)
 
         return btn
