@@ -84,6 +84,10 @@ class ActionResolver:
                         if not a.isSeparator() and action_key(a) not in placed_ids:
                             add(a)
                 else:
+                    if ">" in name:
+                        # Submenus often have no objectName; remember the
+                        # entry name
+                        self._entry_names[action_key(menu.menuAction())] = name
                     add(menu.menuAction())
                 continue
             action = self.main_window.findChild(QAction, name)
