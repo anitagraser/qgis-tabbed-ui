@@ -25,7 +25,8 @@ def divider_color(palette):
 
 
 # Colors use palette() roles so the ribbon follows the active QGIS theme
-# (e.g. Night Mapping) instead of hard-coded light colors.
+# (e.g. Night Mapping) instead of hard-coded light colors. The tabs are left
+# unstyled so they look like the other tabs of the theme.
 RIBBON_STYLESHEET = """
 QTabWidget::pane {
     border: none;
@@ -34,26 +35,6 @@ QTabWidget::pane {
 }
 QTabWidget::tab-bar {
     alignment: left;
-}
-QTabBar::tab {
-    background: palette(button);
-    border: 1px solid palette(mid);
-    border-bottom: none;
-    padding: 5px 14px;
-    margin-right: 1px;
-    font-weight: 500;
-    min-width: 50px;
-    color: palette(button-text);
-}
-QTabBar::tab:selected {
-    background: palette(window);
-    border-top: 2px solid palette(highlight);
-    border-bottom: 1px solid palette(window);
-    color: palette(window-text);
-    font-weight: 600;
-}
-QTabBar::tab:hover:!selected {
-    background: palette(midlight);
 }
 """
 
