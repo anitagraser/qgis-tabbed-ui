@@ -65,7 +65,7 @@ class ActionResolver:
             if name.startswith("dock:"):
                 dock = self.main_window.findChild(QDockWidget, name[len("dock:") :])
                 if dock is not None:
-                    action = dock.toggleViewAction()
+                    action = self.dock_action(dock)
                     # Toggle actions have no objectName; remember the entry name
                     self._entry_names[action_key(action)] = name
                     add(action)
@@ -94,6 +94,29 @@ class ActionResolver:
             if action is not None:
                 add(action)
         return actions
+
+    def dock_action(self, dock):
+        """A show/hide action for a panel. Unlike the dock's own
+        toggleViewAction, it brings a panel tabbed behind another to the
+        front instead of hiding it."""
+        toggle = dock.toggleViewAction()
+        action = QAction(toggle.icon(), toggle.text(), self.menu_parent)
+        action.setToolTip(toggle.toolTip())
+        action.setCheckable(True)
+        action.setChecked(dock.isVisible())
+
+        def show_or_hide():
+            # A panel tabbed behind another is not visible, but not hidden
+            if dock.isVisible():
+                dock.hide()
+            else:
+                dock.show()
+                dock.raise_()
+            action.setChecked(dock.isVisible())
+
+        action.triggered.connect(show_or_hide)
+        dock.visibilityChanged.connect(action.setChecked)
+        return action
 
     def find_submenu(self, parent_name, title):
         """Find a submenu of a named menu by its (cleaned) title."""
