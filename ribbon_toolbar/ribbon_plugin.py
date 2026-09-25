@@ -9,7 +9,14 @@ from pathlib import Path
 from qgis.core import Qgis, QgsMessageLog
 from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtGui import QIcon
-from qgis.PyQt.QtWidgets import QAction, QHBoxLayout, QToolBar, QToolButton, QWidget
+from qgis.PyQt.QtWidgets import (
+    QAction,
+    QHBoxLayout,
+    QMenu,
+    QToolBar,
+    QToolButton,
+    QWidget,
+)
 
 
 class RibbonToolbarPlugin:
@@ -24,6 +31,7 @@ class RibbonToolbarPlugin:
         self.ribbon_toolbar = None
         self.ribbon_widget = None
         self.toggle_action = None
+        self.menubar_action = None
         # Store original visibility states for toolbars
         self._original_toolbar_visibility = {}
         self._original_menubar_visible = True
@@ -45,6 +53,15 @@ class RibbonToolbarPlugin:
         self.toggle_action.triggered.connect(self._on_toggle)
         self.iface.addToolBarIcon(self.toggle_action)
         self.iface.addPluginToMenu("&Ribbon Toolbar", self.toggle_action)
+
+        # Show/hide the (collapsed) menubar while the ribbon is active
+        self.menubar_action = QAction(
+            QIcon(str(self.plugin_dir / "menubar.svg")),
+            "Toggle Menu Bar",
+            self.main_window,
+        )
+        self.menubar_action.setCheckable(True)
+        self.menubar_action.toggled.connect(self._set_menubar_expanded)
 
         # Create the menubar corner widget as a proper child of the menubar so it
         # is still visible when the main window layout is finalized after startup.
@@ -71,6 +88,8 @@ class RibbonToolbarPlugin:
             self._deactivate_ribbon()
         self.iface.removePluginMenu("&Ribbon Toolbar", self.toggle_action)
         self.iface.removeToolBarIcon(self.toggle_action)
+        self.menubar_action.deleteLater()
+        self.menubar_action = None
 
         # Disconnect initialization signal if still connected
         try:
@@ -94,6 +113,60 @@ class RibbonToolbarPlugin:
         button.setDefaultAction(self.toggle_action)
         button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         return button
+
+    def _make_quick_access_bar(self):
+        """Create the row of quick access buttons left of the ribbon tabs."""
+        bar = QWidget()
+        layout = QHBoxLayout(bar)
+        layout.setContentsMargins(2, 0, 6, 0)
+        layout.setSpacing(0)
+        actions = [
+            self.menubar_action,
+            self.iface.actionOpenProject(),
+            self.iface.actionSaveProject(),
+            self.main_window.findChild(QAction, "mActionUndo"),
+            self.main_window.findChild(QAction, "mActionRedo"),
+        ]
+        for action in actions:
+            if action is None:
+                continue
+            button = QToolButton(bar)
+            button.setDefaultAction(action)
+            button.setAutoRaise(True)
+            layout.addWidget(button)
+        return bar
+
+    def _make_hamburger_button(self):
+        """Create the hamburger button that gives access to all QGIS menus."""
+        button = QToolButton()
+        button.setIcon(QIcon(str(self.plugin_dir / "hamburger.svg")))
+        button.setToolTip("Menu")
+        button.setAutoRaise(True)
+        button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        button.setStyleSheet("QToolButton::menu-indicator { image: none; }")
+        menu = QMenu(button)
+        # Rebuild on each show so menus added later (e.g. by plugins) appear
+        menu.aboutToShow.connect(lambda: self._populate_hamburger_menu(menu))
+        button.setMenu(menu)
+        return button
+
+    def _populate_hamburger_menu(self, menu):
+        menu.clear()
+        for action in self.main_window.menuBar().actions():
+            if action.menu() is not None and action.isVisible():
+                menu.addAction(action)
+        menu.addSeparator()
+        menu.addAction(self.menubar_action)
+        menu.addAction(self.toggle_action)
+
+    def _set_menubar_expanded(self, expanded):
+        """Expand or collapse the menubar while the ribbon is active."""
+        if not self.ribbon_active:
+            return
+        menubar = self.main_window.menuBar()
+        menubar.setMaximumHeight(
+            self._original_menubar_max_height if expanded else 0
+        )
 
     def _on_initialization_completed(self):
         """Called after QGIS initialization is complete. Activate ribbon and render UI."""
@@ -147,10 +220,13 @@ class RibbonToolbarPlugin:
         self.ribbon_toolbar.setContextMenuPolicy(Qt.ContextMenuPolicy.PreventContextMenu)
 
         self.ribbon_widget.build_ribbon()
-        # The menubar (and its corner toggle button) gets collapsed below,
-        # so put a toggle button in the ribbon's own corner as well
+        # LibreOffice-style corners: quick access buttons left of the tabs,
+        # hamburger menu (which also holds the ribbon toggle) on the right
         self.ribbon_widget.setCornerWidget(
-            self._make_toggle_button(), Qt.Corner.TopRightCorner
+            self._make_quick_access_bar(), Qt.Corner.TopLeftCorner
+        )
+        self.ribbon_widget.setCornerWidget(
+            self._make_hamburger_button(), Qt.Corner.TopRightCorner
         )
         self.ribbon_toolbar.addWidget(self.ribbon_widget)
         self.main_window.addToolBar(Qt.ToolBarArea.TopToolBarArea, self.ribbon_toolbar)
@@ -170,6 +246,7 @@ class RibbonToolbarPlugin:
         menubar.setMaximumHeight(0)
 
         self.ribbon_active = True
+        self.menubar_action.setChecked(False)
 
     def _deactivate_ribbon(self):
         """Restore menus/toolbars and remove the ribbon."""
@@ -184,6 +261,8 @@ class RibbonToolbarPlugin:
             self.ribbon_widget = None
 
         # Restore menubar
+        self.ribbon_active = False
+        self.menubar_action.setChecked(False)
         menubar = self.main_window.menuBar()
         if self._original_menubar_max_height is not None:
             menubar.setMaximumHeight(self._original_menubar_max_height)
