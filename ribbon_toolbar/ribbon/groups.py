@@ -2,16 +2,35 @@
 """Ribbon groups: framed sections of buttons with a title below."""
 
 from qgis.PyQt.QtCore import QSize, Qt
+from qgis.PyQt.QtGui import QPainter
 from qgis.PyQt.QtWidgets import QFrame, QGridLayout, QHBoxLayout, QLabel, QVBoxLayout
 
 from ..tabs import TOOLBAR_GROUP_OPTIONS
-from .styles import DEFAULT_ROWS, GROUP_FRAME_STYLE, GROUP_TITLE_STYLE
+from .styles import (
+    DEFAULT_ROWS,
+    GROUP_FRAME_STYLE,
+    GROUP_TITLE_STYLE,
+    divider_color,
+)
+
+
+class _GroupFrame(QFrame):
+    """A ribbon group frame with a divider on its right edge (painted, so
+    it follows theme changes)."""
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        painter = QPainter(self)
+        painter.setPen(divider_color(self.palette()))
+        x = self.width() - 1
+        painter.drawLine(x, 0, x, self.height() - 1)
+        painter.end()
 
 
 def _make_group_frame():
     """Create the framed container of a ribbon group. Returns (frame, its
     vertical layout)."""
-    group = QFrame()
+    group = _GroupFrame()
     group.setObjectName("ribbonGroup")
     group.setStyleSheet(GROUP_FRAME_STYLE)
 
