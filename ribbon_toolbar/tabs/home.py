@@ -1,0 +1,132 @@
+# -*- coding: utf-8 -*-
+"""Home tab: hand-arranged groups from the View and Layer menus (built
+together with the View tab, see tabs/__init__.py)."""
+
+# Shared by the Home and Vector tabs
+SELECTION_GROUP = (
+    "Selection",
+    ["mActionSelectFeatures"],
+    [
+        "mActionSelectPolygon",
+        "mActionSelectFreehand",
+        "mActionSelectRadius",
+        "mActionSelectByForm",
+        "mActionSelectByExpression",
+        "mActionSelectAll",
+        "mActionInvertSelection",
+        "mActionReselect",
+        "mActionDeselectAll",
+        "mActionDeselectActiveLayer",
+    ],
+    {"rows": 2, "icon_size": 24},
+)
+
+GROUPS = [
+    ("Layer", ["mActionDataSourceManager"], ["mLayerMenu/*"], {"labels": False}),
+    (
+        "Identify",
+        ["mActionIdentify"],
+        ["mActionMapTips", "ActionFeatureAction", "mViewMenu>Measure"],
+    ),
+    (
+        "Pan",
+        ["mActionPan"],
+        ["mActionPanToSelected", "mActionNewBookmark", "mActionShowBookmarkManager"],
+    ),
+    (
+        "Zoom",
+        ["mActionZoomIn", "mActionZoomOut"],
+        [
+            "mActionZoomFullExtent",
+            "mActionZoomToSelected",
+            "mActionZoomToLayers",
+            "mActionZoomLast",
+            "mActionZoomNext",
+            "mActionZoomActualSize",
+        ],
+        {"rows": 2, "icon_size": 24},
+    ),
+    SELECTION_GROUP,
+    (
+        "Attributes",
+        ["ActionOpenTable"],
+        ["mActionOpenFieldCalc", "mActionStatisticalSummary", "mMenuFilterTable"],
+    ),
+]
+
+EXCLUDED = [
+    # Duplicates the Measure submenu
+    "ActionMeasure",
+    # Layer menu actions left out of the Layer group
+    # (mActionOpenTable duplicates the Attribute Table button)
+    "mActionOpenTable",
+    "mActionLayerSaveAs",
+    "mActionSaveLayerDefinition",
+    "mActionLayerProperties",
+    "mActionSetLayerScaleVisibility",
+    "mActionSetLayerCRS",
+    "mActionSetProjectCRSFromLayer",
+    "mActionLabeling",
+    "mActionRemoveLayer",
+    "mActionLayerSubsetString",
+    "mActionDuplicateLayer",
+    "mActionCopyLayer",
+    "mActionPasteLayer",
+    # On the Vector tab instead
+    "mNewLayerMenu",
+    # In the Add Layer button's dropdown
+    "mActionEmbedLayers",
+    "mActionAddLayerDefinition",
+    # Shown on the Raster / Vector tab / Layers panel toolbar instead
+    "mActionShowGeoreferencer",
+    "mActionToggleEditing",
+    "mActionSaveLayerEdits",
+    "mActionAllEdits",
+    "mActionCopyStyle",
+    "mActionPasteStyle",
+    "mAddLayerMenu",
+]
+
+SHORT_LABELS = {
+    "mActionDataSourceManager": "Add Layer",
+    "mActionIdentify": "Identify",
+    "mActionPan": "Pan",
+    "mActionPanToSelected": "Pan to Selection",
+    "mActionNewBookmark": "New Bookmark",
+    "mActionShowBookmarkManager": "Bookmark Manager",
+    "ActionOpenTable": "Attribute Table",
+    "mActionOpenFieldCalc": "Field Calculator",
+    "mActionStatisticalSummary": "Statistics",
+}
+
+ICON_OVERRIDES = {
+    "mActionReselect": "reselect.svg",
+}
+
+ICON_ONLY = {
+    "mActionZoomIn",
+    "mActionZoomOut",
+    "mActionZoomFullExtent",
+    "mActionZoomToSelected",
+    "mActionZoomToLayers",
+    "mActionZoomLast",
+    "mActionZoomNext",
+    "mActionZoomActualSize",
+    "mActionSelectPolygon",
+    "mActionSelectFreehand",
+    "mActionSelectRadius",
+    "mActionSelectByForm",
+    "mActionSelectByExpression",
+    "mActionSelectAll",
+    "mActionInvertSelection",
+    "mActionReselect",
+    "mActionDeselectAll",
+    "mActionDeselectActiveLayer",
+}
+
+BUTTON_MENUS = {
+    "mActionDataSourceManager": [
+        ("mActionEmbedLayers", "Embed Layers and Groups…"),
+        ("mActionAddLayerDefinition", "Add from Layer Definition File…"),
+    ],
+}

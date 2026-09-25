@@ -6,7 +6,6 @@ Handles plugin lifecycle and toggling between ribbon and classic UI.
 
 from pathlib import Path
 
-from qgis.core import Qgis, QgsMessageLog
 from qgis.PyQt import sip
 from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtGui import QIcon
@@ -43,6 +42,7 @@ class RibbonToolbarPlugin:
         self._original_menubar_visible = True
         self._original_menubar_max_height = None
         self.plugin_dir = Path(__file__).parent
+        self.icons_dir = self.plugin_dir / "icons"
         # Actions added to the Layers panel toolbar (+ trailing separator)
         self._layer_panel_toolbar = None
         self._layer_panel_added_actions = []
@@ -52,7 +52,7 @@ class RibbonToolbarPlugin:
 
     def initGui(self):
         """Called when plugin is loaded."""
-        icon_path = self.plugin_dir / "icon.svg"
+        icon_path = self.icons_dir / "icon.svg"
         icon = QIcon(str(icon_path)) if icon_path.exists() else QIcon()
 
         # Toggle action
@@ -65,7 +65,7 @@ class RibbonToolbarPlugin:
 
         # Show/hide the (collapsed) menubar while the ribbon is active
         self.menubar_action = QAction(
-            QIcon(str(self.plugin_dir / "menubar.svg")),
+            QIcon(str(self.icons_dir / "menubar.svg")),
             "Toggle Menu Bar",
             self.main_window,
         )
@@ -148,7 +148,7 @@ class RibbonToolbarPlugin:
     def _make_hamburger_button(self):
         """Create the hamburger button that gives access to all QGIS menus."""
         button = QToolButton()
-        button.setIcon(QIcon(str(self.plugin_dir / "hamburger.svg")))
+        button.setIcon(QIcon(str(self.icons_dir / "hamburger.svg")))
         button.setToolTip("Menu")
         button.setAutoRaise(True)
         button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
@@ -250,12 +250,6 @@ class RibbonToolbarPlugin:
                 and tb.parent() == self.main_window
             ):
                 self._original_toolbar_visibility[tb.objectName()] = tb.isVisible()
-
-        QgsMessageLog.logMessage(
-            str(self._original_toolbar_visibility).replace(",", ",\n"),
-            "Ribbon Toolbar",
-            level=Qgis.MessageLevel.Info,
-        )
 
         # Build the ribbon
         from .ribbon_widget import RibbonWidget
