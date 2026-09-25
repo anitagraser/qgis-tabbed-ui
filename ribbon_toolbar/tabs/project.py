@@ -4,12 +4,12 @@
 from .spec import ArrangedTab
 
 GROUPS = [
-    ("New", ["mActionNewProject"], ["mProjectFromTemplateMenu", "mActionCloseProject"]),
+    ("New", ["mActionNewProject"], []),
     ("Open", ["mActionOpenProject"], []),
     (
         "Save",
         ["mActionSaveProject"],
-        ["mActionSaveProjectAs", "mProjectToStorageMenu", "mActionRevertProject"],
+        ["mActionSaveProjectAs", "mActionRevertProject"],
     ),
     (
         "Project Settings",
@@ -25,27 +25,35 @@ GROUPS = [
         "Import/Export",
         [],
         [
-            ("Export Map to…", ["mActionSaveMapAsImage", "mActionSaveMapAsPdf"]),
+            "mActionSaveMapAsImage",
+            "mActionSaveMapAsPdf",
             ("DWG/DXF", ["mActionDxfExport", "mActionDwgImport"]),
             "menuImport_Export/*",
         ],
     ),
 ]
 
-# mRecentProjectsMenu is the Open button's dropdown
+# mProjectFromTemplateMenu, mRecentProjectsMenu and mProjectToStorageMenu
+# are the New, Open and Save buttons' dropdowns
 EXCLUDED = [
+    "mProjectFromTemplateMenu",
+    "mActionCloseProject",
     "mActionExit",
     "mProjectFromStorageMenu",
     "mRecentProjectsMenu",
+    "mProjectToStorageMenu",
     "mLayoutsMenu",
 ]
 
 TAB = ArrangedTab(menu="mProjectMenu", groups=GROUPS, excluded=EXCLUDED)
 
-SHORT_LABELS = {
-    "mProjectFromTemplateMenu": "From Template",
+ICON_OVERRIDES = {
+    "mActionSnappingOptions": ":/images/themes/default/mIconSnapping.svg",
+    "mProjectMenu>Models": ":/images/themes/default/processingModel.svg",
 }
 
 BUTTON_MENUS = {
+    "mActionNewProject": "mProjectFromTemplateMenu",
     "mActionOpenProject": "mRecentProjectsMenu",
+    "mActionSaveProject": "mProjectToStorageMenu",
 }
