@@ -14,24 +14,14 @@ buttons: {"rows": number of rows (default 3), "icon_size": icon size in px,
 "labels": False to show small buttons compactly (icon only if they have an
 icon, otherwise text only)}.
 
-Each tab module may define any of these tables, which are merged:
+Each tab module defines TAB, the tab's description (see tabs/spec.py);
+the ribbon shows the tabs in the order of TAB_MODULES. A module may also
+define any of these tables, which are merged:
 
-ARRANGED_TABS: menu objectName -> (excluded entries, [(tab title, groups),
-    ...]). A menu can be split over several tabs; a tab title of None uses
-    the menu title, and actions from the menu / its toolbars not arranged
-    go into a "More" group on the first tab.
-EXTRA_TAB_GROUPS: menu objectName -> groups placed at the start of that
-    standard (not arranged) tab, e.g. for actions from other menus.
-MERGED_TABS: standard tab menu -> other menus whose groups it also shows
-    (they then get no tab of their own), before the tab's own groups.
-MENU_GROUP_REPLACEMENTS: menu objectName -> groups replacing its menu
-    group ("<Menu> Menu").
 TOOLBAR_GROUP_OPTIONS: toolbar objectName -> options laying out its group
     as a split group of small buttons; "large" lists the objectNames of
     actions shown as large buttons instead, "only" limits the group to the
     listed objectNames, "exclude" leaves the listed ones out.
-TOOLBAR_TABS: [(tab title, [toolbar objectNames])] for tabs (before the
-    Styling tab) showing one group per toolbar.
 SHORT_LABELS: entry name -> shorter button label (tooltips keep the full
     text).
 ICON_OVERRIDES: entry name -> icon for buttons whose action has none: a
@@ -48,22 +38,7 @@ from . import gps, home, mesh, plugins, project, raster, styling, vector, view
 
 TAB_MODULES = [project, home, view, raster, vector, mesh, gps, styling, plugins]
 
-# Menu tabs, in the order they appear in the ribbon
-TAB_ORDER = [
-    "mProjectMenu",
-    "mViewMenu",
-    "mRasterMenu",
-    "mVectorMenu",
-    "mMeshMenu",
-]
-
-# Menu tabs placed after TOOLBAR_TABS and the Styling tab
-TRAILING_TAB_ORDER = [
-    "mPluginMenu",
-]
-
-# Tab shown when the ribbon is created
-DEFAULT_TAB = "mViewMenu"
+TABS = [module.TAB for module in TAB_MODULES]
 
 
 def _merge(name, kind=dict, modules=TAB_MODULES):
@@ -82,17 +57,7 @@ def _merge(name, kind=dict, modules=TAB_MODULES):
     return merged
 
 
-ARRANGED_TABS = _merge("ARRANGED_TABS")
-# The View menu is split over the Home and View tabs
-ARRANGED_TABS["mViewMenu"] = (
-    home.EXCLUDED + view.EXCLUDED,
-    [("Home", home.GROUPS), ("View", view.GROUPS)],
-)
-EXTRA_TAB_GROUPS = _merge("EXTRA_TAB_GROUPS")
-MERGED_TABS = _merge("MERGED_TABS")
-MENU_GROUP_REPLACEMENTS = _merge("MENU_GROUP_REPLACEMENTS")
 TOOLBAR_GROUP_OPTIONS = _merge("TOOLBAR_GROUP_OPTIONS")
-TOOLBAR_TABS = [tab for module in TAB_MODULES for tab in getattr(module, "TOOLBAR_TABS", [])]
 SHORT_LABELS = _merge("SHORT_LABELS")
 ICON_OVERRIDES = _merge("ICON_OVERRIDES")
 ICON_ONLY = _merge("ICON_ONLY", set)

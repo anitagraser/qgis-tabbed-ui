@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """Project tab: hand-arranged groups for the Project menu."""
 
+from .spec import ArrangedTab
+
 GROUPS = [
     ("New", ["mActionNewProject"], ["mProjectFromTemplateMenu", "mActionCloseProject"]),
     ("Open", ["mActionOpenProject"], []),
@@ -38,9 +40,7 @@ EXCLUDED = [
     "mLayoutsMenu",
 ]
 
-ARRANGED_TABS = {
-    "mProjectMenu": (EXCLUDED, [(None, GROUPS)]),
-}
+TAB = ArrangedTab(menu="mProjectMenu", groups=GROUPS, excluded=EXCLUDED)
 
 SHORT_LABELS = {
     "mProjectFromTemplateMenu": "From Template",

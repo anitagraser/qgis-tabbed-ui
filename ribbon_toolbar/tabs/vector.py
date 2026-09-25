@@ -3,27 +3,24 @@
 Vector menu and toolbar."""
 
 from .home import SELECTION_GROUP
+from .spec import MenuTab
 
-MERGED_TABS = {
-    "mVectorMenu": ["mEditMenu"],
-}
-
-EXTRA_TAB_GROUPS = {
-    # The Edit menu's groups come first on the Vector tab (MERGED_TABS)
-    "mEditMenu": [
+TAB = MenuTab(
+    menu="mVectorMenu",
+    merged_menus=["mEditMenu"],
+    leading_groups=[
         (
             "Layer",
             [],
             ["mNewLayerMenu", "mActionToggleEditing", "EnableSnappingAction"],
         )
     ],
-}
-
-# The Edit and Vector menus are not shown as menu groups
-MENU_GROUP_REPLACEMENTS = {
-    "mEditMenu": [SELECTION_GROUP],
-    "mVectorMenu": [("Processing", ["toolboxAction"], [])],
-}
+    # The Edit and Vector menus are not shown as menu groups
+    menu_groups={
+        "mEditMenu": [SELECTION_GROUP],
+        "mVectorMenu": [("Processing", ["toolboxAction"], [])],
+    },
+)
 
 TOOLBAR_GROUP_OPTIONS = {
     "mAdvancedDigitizeToolBar": {"rows": 2, "icon_size": 24, "labels": False},
