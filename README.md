@@ -16,6 +16,10 @@ The following screenshot has been created with QGIS 4.2 on Linux Mint using the 
 - Quick-access buttons in the upper left corner
 - Main menu access in the upper right corner
 
+### Out-of-scope
+
+- Customization of ribbons 
+
 ## Usage
 
 After installation a **Toggle Ribbon Toolbar** button appears in the QGIS toolbar. Click it to activate the ribbon. Click again to restore the classic interface.
