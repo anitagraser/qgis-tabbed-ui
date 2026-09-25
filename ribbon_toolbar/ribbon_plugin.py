@@ -7,10 +7,12 @@ Handles plugin lifecycle and toggling between ribbon and classic UI.
 from pathlib import Path
 
 from qgis.core import Qgis, QgsMessageLog
+from qgis.PyQt import sip
 from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import (
     QAction,
+    QDockWidget,
     QHBoxLayout,
     QMenu,
     QToolBar,
@@ -23,6 +25,10 @@ class RibbonToolbarPlugin:
     """QGIS Plugin: Replaces menus/toolbars with a ribbon interface."""
 
     RIBBON_OBJECT_NAME = "RibbonToolbarMain"
+
+    # Actions added to the Layers panel toolbar while the ribbon is active
+    # (inserted after its first action, "Layer Styling")
+    LAYER_PANEL_ACTIONS = ["mActionCopyStyle", "mActionPasteStyle"]
 
     def __init__(self, iface):
         self.iface = iface
@@ -37,6 +43,9 @@ class RibbonToolbarPlugin:
         self._original_menubar_visible = True
         self._original_menubar_max_height = None
         self.plugin_dir = Path(__file__).parent
+        # Actions added to the Layers panel toolbar (+ trailing separator)
+        self._layer_panel_toolbar = None
+        self._layer_panel_added_actions = []
         # Menubar corner widget
         self._corner_widget = None
         self._corner_layout = None
@@ -124,8 +133,8 @@ class RibbonToolbarPlugin:
             self.menubar_action,
             self.iface.actionOpenProject(),
             self.iface.actionSaveProject(),
-            self.main_window.findChild(QAction, "mActionUndo"),
-            self.main_window.findChild(QAction, "mActionRedo"),
+            self.main_window.findChild(QAction, "mActionSelectFeatures"),
+            self.main_window.findChild(QAction, "mActionIdentify"),
         ]
         for action in actions:
             if action is None:
@@ -167,6 +176,47 @@ class RibbonToolbarPlugin:
         menubar.setMaximumHeight(
             self._original_menubar_max_height if expanded else 0
         )
+
+    def _layers_panel_toolbar(self):
+        """Return the toolbar of the Layers panel, if there is one."""
+        for dock in self.main_window.findChildren(QDockWidget):
+            if dock.objectName() == "Layers":
+                toolbars = dock.findChildren(QToolBar)
+                return toolbars[0] if toolbars else None
+        return None
+
+    def _add_layer_panel_actions(self):
+        toolbar = self._layers_panel_toolbar()
+        if toolbar is None:
+            return
+        actions = [
+            a
+            for a in (
+                self.main_window.findChild(QAction, name)
+                for name in self.LAYER_PANEL_ACTIONS
+            )
+            if a is not None and a not in toolbar.actions()
+        ]
+        if not actions:
+            return
+        existing = toolbar.actions()
+        before = existing[1] if len(existing) > 1 else None
+        separator = QAction(toolbar)
+        separator.setSeparator(True)
+        added = actions + [separator]
+        toolbar.insertActions(before, added)
+        self._layer_panel_toolbar = toolbar
+        self._layer_panel_added_actions = added
+
+    def _remove_layer_panel_actions(self):
+        toolbar = self._layer_panel_toolbar
+        if toolbar is not None and not sip.isdeleted(toolbar):
+            for action in self._layer_panel_added_actions:
+                toolbar.removeAction(action)
+                if action.isSeparator():
+                    action.deleteLater()
+        self._layer_panel_toolbar = None
+        self._layer_panel_added_actions = []
 
     def _on_initialization_completed(self):
         """Called after QGIS initialization is complete. Activate ribbon and render UI."""
@@ -245,6 +295,8 @@ class RibbonToolbarPlugin:
         self._original_menubar_max_height = menubar.maximumHeight()
         menubar.setMaximumHeight(0)
 
+        self._add_layer_panel_actions()
+
         self.ribbon_active = True
         self.menubar_action.setChecked(False)
 
@@ -259,6 +311,8 @@ class RibbonToolbarPlugin:
             self.ribbon_toolbar.deleteLater()
             self.ribbon_toolbar = None
             self.ribbon_widget = None
+
+        self._remove_layer_panel_actions()
 
         # Restore menubar
         self.ribbon_active = False
