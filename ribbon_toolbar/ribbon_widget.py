@@ -147,51 +147,52 @@ WIDGET_POPUP_BUTTONS = {
     ("processingToolbar", "Scripts"),
 }
 
+# Colors use palette() roles so the ribbon follows the active QGIS theme
+# (e.g. Night Mapping) instead of hard-coded light colors.
 RIBBON_STYLESHEET = """
 QTabWidget::pane {
-    border: 1px solid #c4c4c4;
-    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                                stop:0 #ffffff, stop:1 #f0f0f0);
+    border: 1px solid palette(mid);
+    background: palette(window);
     margin: 0px;
 }
 QTabWidget::tab-bar {
     alignment: left;
 }
 QTabBar::tab {
-    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                                stop:0 #f8f8f8, stop:1 #e0e0e0);
-    border: 1px solid #c4c4c4;
+    background: palette(button);
+    border: 1px solid palette(mid);
     border-bottom: none;
     padding: 5px 14px;
     margin-right: 1px;
     font-size: 11px;
     font-weight: 500;
     min-width: 50px;
-    color: #333;
+    color: palette(button-text);
 }
 QTabBar::tab:selected {
-    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                                stop:0 #ffffff, stop:1 #f0f0f0);
-    border-bottom: 1px solid #ffffff;
-    color: #0056b3;
+    background: palette(window);
+    border-top: 2px solid palette(highlight);
+    border-bottom: 1px solid palette(window);
+    color: palette(window-text);
     font-weight: 600;
 }
 QTabBar::tab:hover:!selected {
-    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                                stop:0 #e8f0fe, stop:1 #d0e0f8);
+    background: palette(midlight);
 }
 """
 
 GROUP_FRAME_STYLE = """
 QFrame#ribbonGroup {
-    border-right: 1px solid #d0d0d0;
+    border-right: 1px solid palette(mid);
     background: transparent;
     margin: 0px;
     padding: 0px 2px;
 }
 """
 
-GROUP_TITLE_STYLE = "color: #666; font-size: 9px; padding: 0px; margin-top: 1px;"
+GROUP_TITLE_STYLE = (
+    "color: palette(window-text); font-size: 9px; padding: 0px; margin-top: 1px;"
+)
 
 
 class RibbonWidget(QTabWidget):
