@@ -274,7 +274,7 @@ class RibbonToolbarPlugin:
         }
 
         # Build the ribbon
-        from .ribbon_widget import RibbonWidget
+        from .ribbon import RibbonWidget
 
         self.ribbon_widget = RibbonWidget(self.iface, self.main_window)
 
