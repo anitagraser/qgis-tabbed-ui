@@ -1,6 +1,8 @@
 [general]
 name=Ribbon Toolbar
 qgisMinimumVersion=3.22
+qgisMaximumVersion=4.99
+supportsQt6=True
 description=Replaces QGIS menus and toolbars with a Microsoft Office-like ribbon interface
 version=0.1.0
 author=Eithan Weiss Schonberg

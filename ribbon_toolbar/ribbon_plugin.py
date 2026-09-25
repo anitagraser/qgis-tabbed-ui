@@ -27,6 +27,7 @@ class RibbonToolbarPlugin:
         # Store original visibility states for toolbars
         self._original_toolbar_visibility = {}
         self._original_menubar_visible = True
+        self._original_menubar_max_height = None
         self.plugin_dir = Path(__file__).parent
         # Menubar corner widget
         self._corner_widget = None
@@ -45,24 +46,21 @@ class RibbonToolbarPlugin:
         self.iface.addToolBarIcon(self.toggle_action)
         self.iface.addPluginToMenu("&Ribbon Toolbar", self.toggle_action)
 
-        # Create button and corner widget for menubar
-        toggle_button = QToolButton()
-        toggle_button.setDefaultAction(self.toggle_action)
-        toggle_button.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        # Create the menubar corner widget as a proper child of the menubar so it
+        # is still visible when the main window layout is finalized after startup.
+        self._corner_widget = QWidget(self.main_window.menuBar())
+        self._corner_widget.setObjectName("RibbonToggleCornerWidget")
+        self._corner_widget.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self._corner_layout = QHBoxLayout(self._corner_widget)
+        self._corner_layout.setContentsMargins(0, 0, 10, 0)
+        self._corner_layout.setSpacing(0)
 
-        self._corner_layout = QHBoxLayout()
-        self._corner_layout.setContentsMargins(
-            0, 0, 10, 0
-        )  # 10 px margin on right side
+        toggle_button = self._make_toggle_button(self._corner_widget)
         self._corner_layout.addWidget(toggle_button)
-
-        self._corner_widget = QWidget()
-        self._corner_widget.setLayout(self._corner_layout)
-        self._corner_widget.show()
-        self.main_window.menuBar().setCornerWidget(
-            self._corner_widget, Qt.TopRightCorner
-        )
         self._corner_widget.setVisible(True)
+        self.main_window.menuBar().setCornerWidget(
+            self._corner_widget, Qt.Corner.TopRightCorner
+        )
 
         # Connect to initialization completed to render ribbon
         self.iface.initializationCompleted.connect(self._on_initialization_completed)
@@ -83,9 +81,19 @@ class RibbonToolbarPlugin:
             pass
 
         # Remove the toggle button from the menubar corner
-        self._corner_widget.setVisible(False)
+        if self._corner_widget is not None:
+            self._corner_widget.hide()
+            self._corner_widget.deleteLater()
+            self._corner_widget = None
         menubar = self.main_window.menuBar()
         menubar.setCornerWidget(QWidget())
+
+    def _make_toggle_button(self, parent=None):
+        """Create a tool button bound to the toggle action."""
+        button = QToolButton(parent)
+        button.setDefaultAction(self.toggle_action)
+        button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        return button
 
     def _on_initialization_completed(self):
         """Called after QGIS initialization is complete. Activate ribbon and render UI."""
@@ -123,7 +131,7 @@ class RibbonToolbarPlugin:
         QgsMessageLog.logMessage(
             str(self._original_toolbar_visibility).replace(",", ",\n"),
             "Ribbon Toolbar",
-            level=Qgis.Info,
+            level=Qgis.MessageLevel.Info,
         )
 
         # Build the ribbon
@@ -136,11 +144,16 @@ class RibbonToolbarPlugin:
         self.ribbon_toolbar.setObjectName(self.RIBBON_OBJECT_NAME)
         self.ribbon_toolbar.setMovable(False)
         self.ribbon_toolbar.setFloatable(False)
-        self.ribbon_toolbar.setContextMenuPolicy(Qt.PreventContextMenu)
+        self.ribbon_toolbar.setContextMenuPolicy(Qt.ContextMenuPolicy.PreventContextMenu)
 
         self.ribbon_widget.build_ribbon()
+        # The menubar (and its corner toggle button) gets collapsed below,
+        # so put a toggle button in the ribbon's own corner as well
+        self.ribbon_widget.setCornerWidget(
+            self._make_toggle_button(), Qt.Corner.TopRightCorner
+        )
         self.ribbon_toolbar.addWidget(self.ribbon_widget)
-        self.main_window.addToolBar(Qt.TopToolBarArea, self.ribbon_toolbar)
+        self.main_window.addToolBar(Qt.ToolBarArea.TopToolBarArea, self.ribbon_toolbar)
 
         # Hide toolbars docked to the main window only (not toolbars inside panels)
         for tb in self.main_window.findChildren(QToolBar):
@@ -149,6 +162,12 @@ class RibbonToolbarPlugin:
                 and tb.parent() == self.main_window
             ):
                 tb.setVisible(False)
+
+        # Collapse the menubar instead of hiding it: Qt only triggers menu
+        # action shortcuts while the menubar is visible
+        menubar = self.main_window.menuBar()
+        self._original_menubar_max_height = menubar.maximumHeight()
+        menubar.setMaximumHeight(0)
 
         self.ribbon_active = True
 
@@ -165,7 +184,11 @@ class RibbonToolbarPlugin:
             self.ribbon_widget = None
 
         # Restore menubar
-        self.main_window.menuBar().setVisible(True)
+        menubar = self.main_window.menuBar()
+        if self._original_menubar_max_height is not None:
+            menubar.setMaximumHeight(self._original_menubar_max_height)
+            self._original_menubar_max_height = None
+        menubar.setVisible(True)
 
         # Check if all toolbars are false - if so, use defaults
         all_toolbars_false = all(
