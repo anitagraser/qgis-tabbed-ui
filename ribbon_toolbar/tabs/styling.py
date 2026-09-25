@@ -12,7 +12,7 @@ TAB = ToolbarTab(
         ("mAnnotationsToolBar", "Annotations"),
     ],
     toolbar_extra_entries={
-        "mAnnotationsToolBar": ["mEditMenu>Add Annotation"],
+        "mAnnotationsToolBar": ["mActionHtmlAnnotation"],
     },
     trailing_groups=[
         (

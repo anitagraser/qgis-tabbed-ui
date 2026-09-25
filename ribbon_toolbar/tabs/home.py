@@ -9,15 +9,9 @@ SELECTION_GROUP = (
     "Selection",
     ["mActionSelectFeatures"],
     [
-        "mActionSelectPolygon",
-        "mActionSelectFreehand",
-        "mActionSelectRadius",
         "mActionSelectByForm",
         "mActionSelectByExpression",
-        "mActionSelectAll",
         "mActionInvertSelection",
-        "mActionReselect",
-        "mActionDeselectAll",
         "mActionDeselectActiveLayer",
     ],
     {"rows": 2, "icon_size": 24},
@@ -57,6 +51,14 @@ GROUPS = [
 ]
 
 EXCLUDED = [
+    # In the dropdown of the Select Features button (BUTTON_MENUS)
+    "mActionSelectPolygon",
+    "mActionSelectFreehand",
+    "mActionSelectRadius",
+    "mActionSelectAll",
+    "mActionReselect",
+    # In the dropdown of the Deselect button (BUTTON_MENUS)
+    "mActionDeselectAll",
     # Duplicates the Measure submenu
     "ActionMeasure",
     # Layer menu actions left out of the Layer group
@@ -105,10 +107,6 @@ SHORT_LABELS = {
     "mActionStatisticalSummary": "Statistics",
 }
 
-ICON_OVERRIDES = {
-    "mActionReselect": "reselect.svg",
-}
-
 ICON_ONLY = {
     "mActionZoomIn",
     "mActionZoomOut",
@@ -118,19 +116,23 @@ ICON_ONLY = {
     "mActionZoomLast",
     "mActionZoomNext",
     "mActionZoomActualSize",
-    "mActionSelectPolygon",
-    "mActionSelectFreehand",
-    "mActionSelectRadius",
     "mActionSelectByForm",
     "mActionSelectByExpression",
-    "mActionSelectAll",
     "mActionInvertSelection",
-    "mActionReselect",
-    "mActionDeselectAll",
     "mActionDeselectActiveLayer",
 }
 
 BUTTON_MENUS = {
+    "mActionSelectFeatures": [
+        "mActionSelectPolygon",
+        "mActionSelectFreehand",
+        "mActionSelectRadius",
+        "mActionSelectAll",
+        "mActionReselect",
+    ],
+    "mActionDeselectActiveLayer": [
+        "mActionDeselectAll",
+    ],
     "mActionDataSourceManager": [
         ("mActionEmbedLayers", "Embed Layers and Groups…"),
         ("mActionAddLayerDefinition", "Add from Layer Definition File…"),

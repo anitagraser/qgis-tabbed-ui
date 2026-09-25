@@ -178,11 +178,17 @@ class ButtonFactory:
         return btn
 
     def _make_button_menu(self, entries, parent):
-        """Build a dropdown of relabelled proxies for BUTTON_MENUS entries."""
+        """Build a dropdown for BUTTON_MENUS entries: QGIS' own actions, or
+        relabelled proxies for (objectName, label) entries."""
         menu = QMenu(parent)
-        for name, label in entries:
+        for entry in entries:
+            name, label = entry if isinstance(entry, tuple) else (entry, None)
             source = self.main_window.findChild(QAction, name)
             if source is None:
+                continue
+            if label is None:
+                # Shares its enabled and checked state with QGIS
+                menu.addAction(source)
                 continue
             proxy = menu.addAction(source.icon(), label)
             proxy.triggered.connect(source.trigger)

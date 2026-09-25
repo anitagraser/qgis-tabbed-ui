@@ -28,8 +28,9 @@ ICON_OVERRIDES: entry name -> icon for buttons whose action has none: a
     file in the plugin's icons folder, or a Qt resource path (":/...").
 ICON_ONLY: entry names shown without a label (tooltips keep the text).
 BUTTON_MENUS: action objectName -> dropdown for its button (click runs the
-    action, the arrow shows the listed (action objectName, label) entries,
-    or the QMenu with the given objectName).
+    action, the arrow shows the listed entries: action objectNames, or
+    (action objectName, label) tuples for relabelled copies; or the QMenu
+    with the given objectName).
 LABELED_ACTIONS: actions whose small buttons on standard tabs show their
     label beside the icon (instead of the icon only).
 """
