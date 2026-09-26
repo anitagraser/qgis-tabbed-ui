@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-"""Styling tab: layer styling, the Labels and Annotations toolbars and
-point symbol tools."""
+"""Styling tab: layer styling, the Labels and Annotations toolbars, map
+decorations and point symbol tools."""
 
 from .spec import ToolbarTab
 
@@ -15,6 +15,12 @@ TAB = ToolbarTab(
         "mAnnotationsToolBar": ["mActionHtmlAnnotation"],
     },
     trailing_groups=[
+        (
+            "Decorations",
+            [],
+            ["mViewMenu>Decorations/*"],
+            {"rows": 2, "icon_size": 24, "labels": False},
+        ),
         (
             "Point Symbols",
             [],

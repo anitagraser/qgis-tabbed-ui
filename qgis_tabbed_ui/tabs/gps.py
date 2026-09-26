@@ -6,5 +6,10 @@ from .spec import ToolbarTab
 TAB = ToolbarTab(title="GPS", toolbars=[("mGpsToolBar", None)])
 
 TOOLBAR_GROUP_OPTIONS = {
-    "mGpsToolBar": {"rows": 2, "icon_size": 24, "large": ["mConnectAction"]},
+    "mGpsToolBar": {
+        "rows": 2,
+        "icon_size": 24,
+        "labels": False,
+        "large": ["mConnectAction"],
+    },
 }

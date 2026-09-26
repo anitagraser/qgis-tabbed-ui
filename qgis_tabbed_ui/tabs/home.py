@@ -107,6 +107,13 @@ SHORT_LABELS = {
     "mActionStatisticalSummary": "Statistics",
 }
 
+ICON_OVERRIDES = {
+    # The icon of QGIS' own Measure Line tool
+    "mViewMenu>Measure": ":/images/themes/default/mActionMeasure.svg",
+    # The icon of the attribute table's own filter button
+    "mMenuFilterTable": ":/images/themes/default/mActionFilter2.svg",
+}
+
 ICON_ONLY = {
     "mActionZoomIn",
     "mActionZoomOut",

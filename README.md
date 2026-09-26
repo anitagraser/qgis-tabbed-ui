@@ -29,7 +29,7 @@ Click the Toggle button again (through the menu button in the upper-right corner
 
 ![Toggle button](toggle.png)
 
-## Author
+## Authors
 
 Anita Graser
 

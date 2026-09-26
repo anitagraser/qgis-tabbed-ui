@@ -139,7 +139,8 @@ class GroupFactory:
             btn = self.buttons.make_small_button(action, menu_name, group)
             if btn is None:
                 continue
-            grid.addWidget(btn, row, col)
+            # Not stretched to the column width, which would center labels
+            grid.addWidget(btn, row, col, alignment=Qt.AlignmentFlag.AlignLeft)
             row += 1
             if row >= DEFAULT_ROWS:
                 row = 0

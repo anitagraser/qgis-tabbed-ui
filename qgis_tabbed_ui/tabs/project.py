@@ -50,6 +50,7 @@ TAB = ArrangedTab(menu="mProjectMenu", groups=GROUPS, excluded=EXCLUDED)
 ICON_OVERRIDES = {
     "mActionSnappingOptions": ":/images/themes/default/mIconSnapping.svg",
     "mProjectMenu>Models": ":/images/themes/default/processingModel.svg",
+    "mActionRevertProject": ":/images/themes/default/mActionUndo.svg",
 }
 
 BUTTON_MENUS = {
