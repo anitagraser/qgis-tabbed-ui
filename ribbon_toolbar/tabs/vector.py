@@ -42,6 +42,11 @@ SHORT_LABELS = {
     "mActionAddFeature": "Add Feature",
 }
 
+ICON_OVERRIDES = {
+    # The "new" badge of QGIS' Add Point Feature icon
+    "mNewLayerMenu": "new_layer.svg",
+}
+
 BUTTON_MENUS = {
     "mActionPasteFeatures": [
         ("mActionPasteAsNewVector", "Paste as New Vector Layer…"),

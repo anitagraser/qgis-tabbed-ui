@@ -5,7 +5,7 @@ buttons, and the per-entry label and icon overrides."""
 from pathlib import Path
 
 from qgis.PyQt import sip
-from qgis.PyQt.QtCore import QSize, Qt
+from qgis.PyQt.QtCore import QSize, Qt, QTimer
 from qgis.PyQt.QtGui import QIcon, QPixmap
 from qgis.PyQt.QtWidgets import (
     QAction,
@@ -69,7 +69,11 @@ def clone_widget_button(source, large=False, parent=None, popup=False, labeled=F
     clone.setToolTip(source.toolTip())
     clone.setAutoRaise(True)
     if popup:
-        clone.setMenu(source.menu())
+        source_menu = source.menu()
+        if any(isinstance(a, QWidgetAction) for a in source_menu.actions()):
+            clone.setMenu(_borrowing_menu(source_menu, clone))
+        else:
+            clone.setMenu(source_menu)
         clone.setPopupMode(source.popupMode())
     # Wire click through to the hidden original so all internal logic fires
     clone.clicked.connect(source.click)
@@ -83,12 +87,49 @@ def clone_widget_button(source, large=False, parent=None, popup=False, labeled=F
     return clone
 
 
-def _sync_menu_button(button, action):
-    """Keep a popup-only menu button aligned with its source action."""
+def _borrowing_menu(source_menu, parent):
+    """A menu of the ribbon button showing source_menu's actions. Opening
+    QGIS' own menu (a child of its hidden button) closed it again on mouse
+    release when it held a settings widget. A QWidgetAction's widget can only
+    be in one menu, so the actions move here while the menu is open and go
+    back afterwards."""
+    menu = QMenu(parent)
+    original = []
+
+    def borrow():
+        if menu.actions():
+            # Reopened before give_back ran: still has them
+            return
+        original[:] = source_menu.actions()
+        for a in original:
+            source_menu.removeAction(a)
+        menu.addActions(original)
+
+    def give_back():
+        if sip.isdeleted(menu) or sip.isdeleted(source_menu):
+            return
+        for a in menu.actions():
+            menu.removeAction(a)
+        source_menu.addActions(original)
+
+    menu.aboutToShow.connect(borrow)
+    # Once the menu has finished hiding (and triggered a chosen action)
+    menu.aboutToHide.connect(lambda: QTimer.singleShot(0, give_back))
+    return menu
+
+
+def _sync_menu_button(button, action, first_tool_icon=False):
+    """Keep a popup-only menu button aligned with its source action.
+    first_tool_icon: without an icon of its own, use the first tool's."""
     if sip.isdeleted(button):
         return
     button.setText(clean_text(action.text()))
-    button.setIcon(action.icon())
+    icon = action.icon()
+    if first_tool_icon and icon.isNull() and action.menu() is not None:
+        icons = [a.icon() for a in action.menu().actions() if not a.icon().isNull()]
+        if icons:
+            icon = icons[0]
+    button.setIcon(icon)
     button.setToolTip(clean_text(action.toolTip()) or clean_text(action.text()))
     button.setStatusTip(action.statusTip())
     button.setEnabled(action.isEnabled())
@@ -127,14 +168,16 @@ class ButtonFactory:
         btn = QToolButton(parent)
         btn.setAutoRaise(True)
 
+        # Submenus of "<Menu> Menu" groups
+        menu_popup = popup is None and (
+            menu_name,
+            action.objectName() or clean_text(action.text()),
+        ) in MENU_POPUP_ACTIONS
         if popup is None:
-            popup = (
-                menu_name,
-                action.objectName() or clean_text(action.text()),
-            ) in MENU_POPUP_ACTIONS
+            popup = menu_popup
         if popup:
             source_menu = action.menu()
-            _sync_menu_button(btn, action)
+            _sync_menu_button(btn, action, menu_popup)
             popup_menu = QMenu(btn)
             _sync_popup_menu(popup_menu, source_menu)
             popup_menu.aboutToShow.connect(
@@ -145,7 +188,9 @@ class ButtonFactory:
             btn.setMenu(popup_menu)
             btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
             action.changed.connect(
-                lambda btn=btn, action=action: _sync_menu_button(btn, action)
+                lambda btn=btn, action=action: _sync_menu_button(
+                    btn, action, menu_popup
+                )
             )
         else:
             btn.setDefaultAction(action)
@@ -161,9 +206,13 @@ class ButtonFactory:
                 btn.setMenu(button_menu)
                 btn.setPopupMode(QToolButton.ToolButtonPopupMode.MenuButtonPopup)
 
-        has_icon = not action.icon().isNull()
+        has_icon = not btn.icon().isNull()
         if not large:
-            labeled = labeled or action.objectName() in LABELED_ACTIONS
+            # Menu group dropdowns keep their label: the icon is only their
+            # first tool's
+            labeled = (
+                labeled or menu_popup or action.objectName() in LABELED_ACTIONS
+            )
         style_button(btn, large, labeled, has_icon)
         if not large:
             if labeled and not has_icon:

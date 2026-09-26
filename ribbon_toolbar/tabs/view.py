@@ -5,7 +5,11 @@ with the Home tab, which shares the View menu)."""
 from .spec import ArrangedTab
 
 GROUPS = [
-    ("Map Views", ["mActionNewMapCanvas"], ["mViewMenu>3D Map Views", "mActionDraw"]),
+    (
+        "Map Views",
+        ["mActionNewMapCanvas"],
+        ["mViewMenu>3D Map Views", "mActionDraw", "mViewMenu>Preview Mode"],
+    ),
     (
         "Display",
         [],
@@ -13,8 +17,6 @@ GROUPS = [
             "mActionTemporalController",
             "mActionElevationController",
             "mViewMenu>Elevation Profiles",
-            "mViewMenu>Decorations",
-            "mViewMenu>Preview Mode",
         ],
     ),
     (
@@ -35,6 +37,8 @@ EXCLUDED = [
     "mViewMenu>Layer Visibility",
     # Its actions are shown individually in the Display group
     "mViewMenu>Data Filtering",
+    # Its actions are shown individually on the Styling tab
+    "mViewMenu>Decorations",
     "mActionToggleFullScreen",
     "mActionTogglePanelsVisibility",
     "mActionToggleMapOnly",
@@ -49,4 +53,6 @@ SHORT_LABELS = {
 
 ICON_OVERRIDES = {
     "dock:Overview": "overview.svg",
+    # The icon of QGIS' own New 3D Map View action
+    "mViewMenu>3D Map Views": ":/images/themes/default/mActionNew3DMap.svg",
 }
