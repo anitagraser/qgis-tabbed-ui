@@ -31,7 +31,7 @@ Click the Toggle button again (through the menu button in the upper-right corner
 
 ## Authors
 
-Anita Graser
+Eithan Weiss Schonberg — <eithan.schonberg@gmail.com>
 
-pre-0.5 versions by [Eithan Weiss Schonberg](https://github.com/eithanwes/ribbon_toolbar)
+and Anita Graser
 
