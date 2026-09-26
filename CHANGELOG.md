@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-26
+
+Redesigned ribbon, ported from Anita Graser's [qgis-tabbed-ui](https://github.com/anitagraser/qgis-tabbed-ui).
+
+- Qt6 / QGIS 4 support
+- LibreOffice-style ribbon with a quick access bar that follows the QGIS theme
+- Reorganized tabs: Home, View, Project, Vector, Raster, Mesh, Styling, GPS and Plugins
+- Added missing icons and fixed the Mesh tab dropdowns
+
 ## [0.4.4] - 2026-04-28
 
 - Fix plugin initialization to happen only after UI is ready
