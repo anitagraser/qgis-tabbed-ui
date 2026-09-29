@@ -58,6 +58,17 @@ def style_button(btn, large, labeled, has_icon):
     btn.setFixedHeight(SMALL_BUTTON_HEIGHT)
 
 
+def set_menu_only_popup(btn, large):
+    """Make a button whose only purpose is its menu open it on click. Small
+    buttons get the same arrow placement as the other small dropdown buttons
+    (InstantPopup draws it in the bottom right corner)."""
+    if large:
+        btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+    else:
+        btn.setPopupMode(QToolButton.ToolButtonPopupMode.MenuButtonPopup)
+        btn.clicked.connect(btn.showMenu)
+
+
 def clone_widget_button(source, large=False, parent=None, popup=False, labeled=False):
     """Clone a QToolButton from a QWidgetAction's defaultWidget.
     Returns None for non-QToolButton widgets (spinboxes, etc.).
@@ -68,15 +79,23 @@ def clone_widget_button(source, large=False, parent=None, popup=False, labeled=F
     clone.setIcon(source.icon())
     clone.setToolTip(source.toolTip())
     clone.setAutoRaise(True)
+    # The clone opens its own menu instead of clicking the original
+    menu_only = (
+        popup and source.popupMode() == QToolButton.ToolButtonPopupMode.InstantPopup
+    )
     if popup:
         source_menu = source.menu()
         if any(isinstance(a, QWidgetAction) for a in source_menu.actions()):
             clone.setMenu(_borrowing_menu(source_menu, clone))
         else:
             clone.setMenu(source_menu)
-        clone.setPopupMode(source.popupMode())
-    # Wire click through to the hidden original so all internal logic fires
-    clone.clicked.connect(source.click)
+        if menu_only:
+            set_menu_only_popup(clone, large)
+        else:
+            clone.setPopupMode(source.popupMode())
+    if not menu_only:
+        # Wire click through to the hidden original so all internal logic fires
+        clone.clicked.connect(source.click)
     if labeled:
         default_action = source.defaultAction()
         clone.setText(
@@ -186,7 +205,7 @@ class ButtonFactory:
                 )
             )
             btn.setMenu(popup_menu)
-            btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+            set_menu_only_popup(btn, large)
             action.changed.connect(
                 lambda btn=btn, action=action: _sync_menu_button(
                     btn, action, menu_popup
