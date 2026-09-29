@@ -40,6 +40,8 @@ class MenuTab:
     leading_groups: list = field(default_factory=list)
     # menu objectName -> groups replacing its "<Menu> Menu" group
     menu_groups: dict = field(default_factory=dict)
+    # Groups placed at the end of the tab
+    trailing_groups: list = field(default_factory=list)
     # Split group options for third-party plugin toolbars, shown after the
     # menu's toolbar groups; None: not shown
     plugin_toolbar_options: dict = None

@@ -19,35 +19,34 @@ SELECTION_GROUP = (
 
 GROUPS = [
     ("Layer", ["mActionDataSourceManager"], ["mLayerMenu/*"], {"labels": False}),
+    # Also on the Styling tab: the most common change, one click from Home
+    ("Style", ["dock:LayerStyling"], []),
     (
         "Identify",
         ["mActionIdentify"],
         ["mActionMapTips", "ActionFeatureAction", "mViewMenu>Measure"],
     ),
-    (
-        "Pan",
-        ["mActionPan"],
-        ["mActionPanToSelected", "mActionNewBookmark", "mActionShowBookmarkManager"],
-    ),
+    ("Pan", ["mActionPan"], []),
     (
         "Zoom",
         ["mActionZoomIn", "mActionZoomOut"],
+        # Filled column by column: Zoom Last and Zoom Next share the bottom row
         [
             "mActionZoomFullExtent",
-            "mActionZoomToSelected",
-            "mActionZoomToLayers",
             "mActionZoomLast",
+            "mActionZoomToSelected",
             "mActionZoomNext",
-            "mActionZoomActualSize",
         ],
         {"rows": 2, "icon_size": 24},
     ),
     SELECTION_GROUP,
     (
-        "Attributes",
+        "Data",
         ["ActionOpenTable"],
         ["mActionOpenFieldCalc", "mActionStatisticalSummary", "mMenuFilterTable"],
     ),
+    # Also on the View, Raster and Vector tabs
+    ("Processing", ["toolboxAction"], []),
 ]
 
 EXCLUDED = [
@@ -59,6 +58,11 @@ EXCLUDED = [
     "mActionReselect",
     # In the dropdown of the Deselect button (BUTTON_MENUS)
     "mActionDeselectAll",
+    # In the dropdown of the Pan button (BUTTON_MENUS)
+    "mActionPanToSelected",
+    # In the dropdown of the Zoom Full button (BUTTON_MENUS)
+    "mActionZoomToLayers",
+    "mActionZoomActualSize",
     # Duplicates the Measure submenu
     "ActionMeasure",
     # Layer menu actions left out of the Layer group
@@ -99,12 +103,11 @@ SHORT_LABELS = {
     "mActionDataSourceManager": "Add Layer",
     "mActionIdentify": "Identify",
     "mActionPan": "Pan",
-    "mActionPanToSelected": "Pan to Selection",
-    "mActionNewBookmark": "New Bookmark",
-    "mActionShowBookmarkManager": "Bookmark Manager",
     "ActionOpenTable": "Attribute Table",
     "mActionOpenFieldCalc": "Field Calculator",
     "mActionStatisticalSummary": "Statistics",
+    # The Processing Toolbox, on the Home, View, Raster and Vector tabs
+    "toolboxAction": "Analysis",
 }
 
 ICON_OVERRIDES = {
@@ -130,6 +133,13 @@ ICON_ONLY = {
 }
 
 BUTTON_MENUS = {
+    "mActionZoomFullExtent": [
+        "mActionZoomToLayers",
+        "mActionZoomActualSize",
+    ],
+    "mActionPan": [
+        ("mActionPanToSelected", "Pan to Selection"),
+    ],
     "mActionSelectFeatures": [
         "mActionSelectPolygon",
         "mActionSelectFreehand",

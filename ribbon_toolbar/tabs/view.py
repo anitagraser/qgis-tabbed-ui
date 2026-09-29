@@ -19,6 +19,7 @@ GROUPS = [
             "mViewMenu>Elevation Profiles",
         ],
     ),
+    ("Bookmarks", ["mActionShowBookmarkManager"], ["mActionNewBookmark"]),
     (
         "Overview",
         ["dock:Overview"],
@@ -49,6 +50,8 @@ TAB = ArrangedTab(menu="mViewMenu", title="View", groups=GROUPS, excluded=EXCLUD
 
 SHORT_LABELS = {
     "dock:Overview": "Show Overview",
+    "mActionShowBookmarkManager": "Bookmark Manager",
+    "mActionNewBookmark": "New Bookmark",
 }
 
 ICON_OVERRIDES = {

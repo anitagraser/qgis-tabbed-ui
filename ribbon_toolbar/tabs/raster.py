@@ -9,6 +9,7 @@ TAB = MenuTab(
         ("Georeferencer", ["mActionShowGeoreferencer"], []),
         ("Raster Calculator", ["mActionShowRasterCalculator"], []),
     ],
+    trailing_groups=[("Processing", ["toolboxAction"], [])],
 )
 
 TOOLBAR_GROUP_OPTIONS = {

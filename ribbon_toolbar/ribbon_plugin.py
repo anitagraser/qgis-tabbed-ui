@@ -19,6 +19,8 @@ from qgis.PyQt.QtWidgets import (
     QWidget,
 )
 
+from .locator import RibbonLocator
+
 
 class RibbonToolbarPlugin:
     """QGIS Plugin: Replaces menus/toolbars with a ribbon interface."""
@@ -61,6 +63,8 @@ class RibbonToolbarPlugin:
         # Menubar corner widget
         self._corner_widget = None
         self._corner_layout = None
+        # Moves the QGIS locator search box into the ribbon while it is active
+        self._locator = RibbonLocator(iface)
 
     def initGui(self):
         """Called when plugin is loaded."""
@@ -170,6 +174,17 @@ class RibbonToolbarPlugin:
             button.setAutoRaise(True)
             layout.addWidget(button)
         return bar
+
+    def _make_right_corner(self):
+        """Create the right corner of the ribbon tabs: the QGIS locator
+        search box (moved from the status bar) and the hamburger button."""
+        corner = QWidget()
+        layout = QHBoxLayout(corner)
+        layout.setContentsMargins(0, 0, 2, 0)
+        layout.setSpacing(4)
+        self._locator.move_into(layout)
+        layout.addWidget(self._make_hamburger_button())
+        return corner
 
     def _make_hamburger_button(self):
         """Create the hamburger button that gives access to all QGIS menus."""
@@ -292,7 +307,7 @@ class RibbonToolbarPlugin:
             self._make_quick_access_bar(), Qt.Corner.TopLeftCorner
         )
         self.ribbon_widget.setCornerWidget(
-            self._make_hamburger_button(), Qt.Corner.TopRightCorner
+            self._make_right_corner(), Qt.Corner.TopRightCorner
         )
         self.ribbon_toolbar.addWidget(self.ribbon_widget)
         self.main_window.addToolBar(Qt.ToolBarArea.TopToolBarArea, self.ribbon_toolbar)
@@ -316,6 +331,9 @@ class RibbonToolbarPlugin:
         """Restore menus/toolbars and remove the ribbon."""
         if not self.ribbon_active:
             return
+
+        # Before removing the ribbon, which holds the locator widget
+        self._locator.restore()
 
         # Remove ribbon
         if self.ribbon_toolbar:

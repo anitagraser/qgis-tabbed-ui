@@ -203,6 +203,7 @@ class RibbonWidget(QTabWidget):
                 empty_toolbar_action_ids,
             )
 
+        self._add_arranged_groups(layout, spec.trailing_groups, seen_ids)
         layout.addStretch()
         return spec.title or _menu_title(menu), page
 

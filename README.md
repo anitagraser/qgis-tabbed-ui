@@ -14,6 +14,7 @@ The following screenshot has been created with QGIS 4.2 on Linux Mint using the 
 - Large icons for frequently used tools
 - Small-icon grid layouts for secondary tools
 - Quick-access buttons in the upper left corner
+- Search box for tools, layers and places (the QGIS locator, Ctrl+K) in the upper right corner
 - Main menu access in the upper right corner
 
 ### Out-of-scope

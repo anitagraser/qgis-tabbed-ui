@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Search box (the QGIS locator) moved from the status bar into the ribbon's tab row while the ribbon is active
+- New Bookmark and Bookmark Manager moved from the Home tab to a Bookmarks group on the View tab; Pan to Selection moved into the Pan button's dropdown
+- Layer Styling button on the Home tab, next to Add Layer
+- Home tab's Attributes group renamed to Data
+- Analysis button (the Processing Toolbox) on the Home tab; the toolbox buttons on the View and Vector tabs are labelled Analysis too, and the Raster tab has one as well
+- Zoom to Layer(s) and Zoom to Native Resolution moved into the Zoom Full button's dropdown
+
 ## [0.5.0] - 2026-09-26
 
 Redesigned ribbon, ported from Anita Graser's [qgis-tabbed-ui](https://github.com/anitagraser/qgis-tabbed-ui).
