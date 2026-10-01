@@ -69,7 +69,6 @@ class RibbonLocator:
         }
         self._locator = locator
 
-        layout.addWidget(locator)
         locator.setFixedWidth(self.WIDTH)
         if line_edit is not None:
             shortcut = re.search(r"\([^()]+\)$", line_edit.placeholderText())
@@ -80,6 +79,10 @@ class RibbonLocator:
             # Right-aligned: the list is wider than the box (half the window)
             popup.setAnchorPoint(QgsFloatingWidget.AnchorPoint.TopRight)
             popup.setAnchorWidgetPoint(QgsFloatingWidget.AnchorPoint.BottomRight)
+        # Reparent last: QgsFloatingWidget maps the locator into the popup's
+        # parent (the main window), which crashes (access violation) once the
+        # locator is in layout, which is not yet attached to the main window
+        layout.addWidget(locator)
 
     def restore(self):
         """Put the locator widget back where it was in the status bar.
